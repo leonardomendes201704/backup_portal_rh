@@ -38,6 +38,8 @@ using RhPortal.Api.Logging.Context;
 using RhPortal.Api.Logging.Filters;
 using RhPortal.Api.Logging.Logger;
 using RhPortal.Api.Logging.Middleware;
+using RhPortal.Api.Infrastructure.Pdf;
+using RhPortal.Api.Infrastructure.Html;
 using RhPortal.Api.Logging.Writer;
 using RhPortal.Api.Domain.Entities;
 using RhPortal.Api.Infrastructure.Data;
@@ -124,6 +126,8 @@ builder.Services.AddHostedService<InboxFolderWatcherService>();
 
 builder.Services.AddSingleton<ResetState>();
 builder.Services.AddScoped<NotificationPublisher>();
+builder.Services.AddSingleton<CandidateResumePdfBuilder>();
+builder.Services.AddSingleton<CandidateResumeHtmlBuilder>();
 
 // Email messaging (queue + SMTP/IMAP)
 builder.Services.AddSingleton<ISecretProtector, AesSecretProtector>();

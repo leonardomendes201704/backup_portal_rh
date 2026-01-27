@@ -16,12 +16,10 @@
     function openJobModal(item) {
       document.getElementById("jobModalLabel").textContent = item.dataset.title;
       document.getElementById("jobModalCompany").textContent = item.dataset.company;
-
       document.getElementById("jobModalMode").textContent = item.dataset.mode;
       document.getElementById("jobModalType").textContent = item.dataset.type;
       document.getElementById("jobModalLevel").textContent = item.dataset.level;
       document.getElementById("jobModalArea").textContent = item.dataset.area;
-
       document.getElementById("jobModalLocation").textContent = item.dataset.location;
 
       const min = Number(item.dataset.salaryMin) || 0;

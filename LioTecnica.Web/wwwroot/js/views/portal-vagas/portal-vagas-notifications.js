@@ -1,16 +1,24 @@
-// Aba: Notificacoes & Comunicacao
+(() => {
+  if (window.__pvNotifyInit) return;
+  window.__pvNotifyInit = true;
+
+// Aba: Notificações & Comunicação
 // ======================================
 const NOTIFY_STORAGE_KEY = "liotec_portal_notify_v1";
 const NOTIFY_API_BASE = "/PortalVagas/Notifications";
+
+const S = window.PortalVagasStrings || {};
+const SCommon = S.common || { cancel: "Cancelar", clear: "Limpar" };
+const SNotify = S.notifications || {};
 
 let __notifyHydratedOnce = false;
 let __notifySaveTimer = null;
 let notifyLoaded = false;
 let notifyLoading = false;
 
-function defaultNotify(){
+function defaultNotify() {
   return {
-    channels: { email:false, whatsapp:false, sms:false, push:false },
+    channels: { email: false, whatsapp: false, sms: false, push: false },
     frequency: "",
     lang: "",
     emailAddr: "",
@@ -41,34 +49,34 @@ function defaultNotify(){
 
 let notifyCache = defaultNotify();
 
-function loadNotify(){
-  if(!STORAGE_ENABLED) return notifyCache;
-  try{
+function loadNotify() {
+  if (!STORAGE_ENABLED) return notifyCache;
+  try {
     const raw = storageGet(NOTIFY_STORAGE_KEY);
-    if(!raw) return null;
+    if (!raw) return null;
     const obj = JSON.parse(raw);
-    if(!obj || typeof obj !== "object") return null;
+    if (!obj || typeof obj !== "object") return null;
 
     obj.channels = obj.channels || {};
     obj.types = obj.types || {};
     obj.quiet = obj.quiet || {};
     return obj;
-  }catch{
+  } catch {
     return null;
   }
 }
 
-function saveNotifyToStorage(obj){
-  if(!STORAGE_ENABLED){
+function saveNotifyToStorage(obj) {
+  if (!STORAGE_ENABLED) {
     notifyCache = obj;
     return;
   }
-  try{ storageSet(NOTIFY_STORAGE_KEY, JSON.stringify(obj)); }catch{}
+  try { storageSet(NOTIFY_STORAGE_KEY, JSON.stringify(obj)); } catch { }
 }
 
-function mapNotifyResponse(data){
+function mapNotifyResponse(data) {
   const n = defaultNotify();
-  if(!data) return n;
+  if (!data) return n;
   n.channels = {
     email: !!data.canalEmail,
     whatsapp: !!data.canalWhatsapp,
@@ -99,26 +107,26 @@ function mapNotifyResponse(data){
   return n;
 }
 
-async function ensureNotifyLoaded(){
-  if(STORAGE_ENABLED || notifyLoaded || notifyLoading) return;
+async function ensureNotifyLoaded() {
+  if (STORAGE_ENABLED || notifyLoaded || notifyLoading) return;
   notifyLoading = true;
-  try{
+  try {
     const res = await fetch(NOTIFY_API_BASE, { headers: { "Accept": "application/json" }, credentials: "same-origin" });
     const data = await res.json().catch(() => ({}));
-    if(res.ok){
+    if (res.ok) {
       notifyCache = mapNotifyResponse(data);
       __notifyHydratedOnce = false;
     }
-  }catch{
+  } catch {
     // ignore
-  }finally{
+  } finally {
     notifyLoaded = true;
     notifyLoading = false;
   }
 }
 
-async function persistNotifyPreferences(obj){
-  if(STORAGE_ENABLED){
+async function persistNotifyPreferences(obj) {
+  if (STORAGE_ENABLED) {
     saveNotifyToStorage(obj);
     return obj;
   }
@@ -146,7 +154,7 @@ async function persistNotifyPreferences(obj){
     assinatura: obj.signature || ""
   };
 
-  try{
+  try {
     const res = await fetch(NOTIFY_API_BASE, {
       method: "PUT",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
@@ -154,25 +162,25 @@ async function persistNotifyPreferences(obj){
       body: JSON.stringify(body)
     });
     const payload = await res.json().catch(() => ({}));
-    if(res.ok){
+    if (res.ok) {
       notifyCache = mapNotifyResponse(payload);
       return notifyCache;
     }
-  }catch{
+  } catch {
     // ignore
   }
   return null;
 }
 
-function hydrateNotify(){
-  if(__notifyHydratedOnce) return;
+function hydrateNotify() {
+  if (__notifyHydratedOnce) return;
   __notifyHydratedOnce = true;
 
   const n = loadNotify() || defaultNotify();
   saveNotifyToStorage(n);
 
-  const setChk = (id, v)=>{ const el=document.getElementById(id); if(el) el.checked=!!v; };
-  const setVal = (id, v)=>{ const el=document.getElementById(id); if(el) el.value=(v ?? ""); };
+  const setChk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v ?? ""); };
 
   setChk("ntEmail", !!n.channels.email);
   setChk("ntWhatsapp", !!n.channels.whatsapp);
@@ -202,9 +210,9 @@ function hydrateNotify(){
   updateNotifyPreview();
 }
 
-function getNotifyFromUI(){
-  const chk = (id)=>!!document.getElementById(id)?.checked;
-  const val = (id)=> (document.getElementById(id)?.value || "").trim();
+function getNotifyFromUI() {
+  const chk = (id) => !!document.getElementById(id)?.checked;
+  const val = (id) => (document.getElementById(id)?.value || "").trim();
 
   return {
     channels: {
@@ -239,7 +247,7 @@ function getNotifyFromUI(){
   };
 }
 
-function saveNotify(){
+function saveNotify() {
   const existing = loadNotify() || defaultNotify();
   const ui = getNotifyFromUI();
 
@@ -250,195 +258,200 @@ function saveNotify(){
   };
 
   saveNotifyToStorage(merged);
-  if(!STORAGE_ENABLED){
+  if (!STORAGE_ENABLED) {
     persistNotifyPreferences(merged);
   }
   updateNotifyPreview();
 }
 
-function saveNotifyDebounced(){
+function saveNotifyDebounced() {
   clearTimeout(__notifySaveTimer);
   __notifySaveTimer = setTimeout(() => saveNotify(), 250);
 }
 
-function updateNotifyPreview(){
+function updateNotifyPreview() {
   const n = loadNotify() || defaultNotify();
   const el = document.getElementById("ntPreview");
-  if(!el) return;
+  if (!el) return;
 
   const channels = [];
-  if(n.channels.email) channels.push("E-mail");
-  if(n.channels.whatsapp) channels.push("WhatsApp");
-  if(n.channels.sms) channels.push("SMS");
-  if(n.channels.push) channels.push("Push");
+  if (n.channels.email) channels.push("E-mail");
+  if (n.channels.whatsapp) channels.push("WhatsApp");
+  if (n.channels.sms) channels.push("SMS");
+  if (n.channels.push) channels.push("Push");
 
   const types = [];
-  if(n.types.newJobs) types.push("Vagas");
-  if(n.types.appUpdates) types.push("Status");
-  if(n.types.interview) types.push(S.notifications.typeInterviews);
-  if(n.types.messages) types.push(S.notifications.typeMessages);
-  if(n.types.docs) types.push("Docs");
-  if(n.types.reminders) types.push(S.notifications.typeReminders);
+  if (n.types.newJobs) types.push("Vagas");
+  if (n.types.appUpdates) types.push("Status");
+  if (n.types.interview) types.push(SNotify.typeInterviews || "Entrevistas");
+  if (n.types.messages) types.push(SNotify.typeMessages || "Mensagens");
+  if (n.types.docs) types.push("Docs");
+  if (n.types.reminders) types.push(SNotify.typeReminders || "Lembretes");
 
   const quiet = (n.quiet.enabled === "Sim")
-    ? `Silencio: ${n.quiet.start}ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“${n.quiet.end} (${n.quiet.priority})`
-    : "Sem silencio";
+    ? `Silêncio: ${n.quiet.start} - ${n.quiet.end} (${n.quiet.priority || "Normal"})`
+    : "Sem silêncio";
 
-  el.textContent = `${channels.join(", ") || "Nenhum canal"} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${n.frequency} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${types.join(", ") || "Sem alertas"} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${quiet}`;
+  el.textContent = [
+    channels.join(", ") || "Nenhum canal",
+    n.frequency || "Sem frequência",
+    types.join(", ") || "Sem alertas",
+    quiet
+  ].join(" | ");
 }
 
-async function testNotify(){
-  if(!STORAGE_ENABLED && !notifyLoaded){
+async function testNotify() {
+  if (!STORAGE_ENABLED && !notifyLoaded) {
     await ensureNotifyLoaded();
   }
   hydrateNotify();
   const n = loadNotify() || defaultNotify();
 
   const channels = [];
-  if(n.channels.email) channels.push("E-mail");
-  if(n.channels.whatsapp) channels.push("WhatsApp");
-  if(n.channels.sms) channels.push("SMS");
-  if(n.channels.push) channels.push("Push");
+  if (n.channels.email) channels.push("E-mail");
+  if (n.channels.whatsapp) channels.push("WhatsApp");
+  if (n.channels.sms) channels.push("SMS");
+  if (n.channels.push) channels.push("Push");
 
   const quietOn = n.quiet.enabled === "Sim";
 
   Swal.fire({
     icon: "info",
-    title: "Teste de notificacao (simulado)",
+    title: "Teste de notificação (simulado)",
     html: `
       <div class="text-start">
         <div class="text-muted small mb-2">Canais ativos:</div>
         <div class="fw-bold mb-2">${escapeHtml(channels.join(", ") || "Nenhum")}</div>
 
-        <div class="text-muted small mb-2">Frequencia:</div>
+        <div class="text-muted small mb-2">Frequência:</div>
         <div class="fw-bold mb-2">${escapeHtml(n.frequency)}</div>
 
-        <div class="text-muted small mb-2">Horario silencioso:</div>
-        <div class="fw-bold">${escapeHtml(quietOn ? `${n.quiet.start}ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“${n.quiet.end} (${n.quiet.priority})` : "Desativado")}</div>
+        <div class="text-muted small mb-2">Horário silencioso:</div>
+        <div class="fw-bold">${escapeHtml(quietOn ? `${n.quiet.start} - ${n.quiet.end} (${n.quiet.priority})` : "Desativado")}</div>
 
         <hr>
 
         <div class="text-muted small">Exemplo:</div>
         <div class="p-3 border rounded" style="border-radius:14px;background:#f8f9fa;">
-          <div class="fw-bold">Atualizacao de candidatura</div>
-          <div class="small text-muted">Sua candidatura avancou para <strong>Entrevista</strong>.</div>
+          <div class="fw-bold">Atualização de candidatura</div>
+          <div class="small text-muted">Sua candidatura avançou para <strong>Entrevista</strong>.</div>
           ${n.signature ? `<div class="small text-muted mt-2">${escapeHtml(n.signature)}</div>` : ""}
         </div>
       </div>
     `,
-    confirmButtonText: S.notifications.ok,
+    confirmButtonText: SNotify.ok || "Ok",
     confirmButtonColor: "#004aad"
   });
 }
 
-async function seedNotify(){
-  if(!STORAGE_ENABLED && !notifyLoaded){
+async function seedNotify() {
+  if (!STORAGE_ENABLED && !notifyLoaded) {
     await ensureNotifyLoaded();
   }
 
   const existing = loadNotify();
-  if(existing && (existing.emailAddr || existing.phone || existing.updatedAt)){
+  if (existing && (existing.emailAddr || existing.phone || existing.updatedAt)) {
     const hasAny = (existing.emailAddr || "").trim() || (existing.phone || "").trim();
     const hasPrefs = existing && existing.channels && (existing.channels.sms || existing.channels.push);
-    if(hasAny || hasPrefs){
-      Swal.fire({ icon:"info", title:"Ja existe conteudo", text:"Limpe antes para inserir exemplo.", confirmButtonColor:"#004aad" });
+    if (hasAny || hasPrefs) {
+      Swal.fire({ icon: "info", title: "Já existe conteúdo", text: "Limpe antes para inserir exemplo.", confirmButtonColor: "#004aad" });
       return;
     }
   }
 
   const n = defaultNotify();
-  n.channels = { email:true, whatsapp:true, sms:false, push:false };
+  n.channels = { email: true, whatsapp: true, sms: false, push: false };
   n.frequency = "Imediato";
   n.lang = "pt-BR";
   n.emailAddr = "candidato@email.com";
   n.phone = "11 99999-9999";
   n.allowContact = true;
-  n.types = { newJobs:true, appUpdates:true, interview:true, messages:true, docs:true, reminders:true };
-  n.quiet = { enabled:"Sim", start:"22:00", end:"07:00", priority:"Normal" };
-  n.signature = "Obrigado! ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â (Seu nome)";
+  n.types = { newJobs: true, appUpdates: true, interview: true, messages: true, docs: true, reminders: true };
+  n.quiet = { enabled: "Sim", start: "22:00", end: "07:00", priority: "Normal" };
+  n.signature = "Obrigado! (Seu nome)";
   n.updatedAt = new Date().toISOString();
 
-  if(STORAGE_ENABLED){
+  if (STORAGE_ENABLED) {
     saveNotifyToStorage(n);
-  }else{
+  } else {
     notifyCache = n;
     await persistNotifyPreferences(notifyCache);
   }
   __notifyHydratedOnce = false;
   renderNotify();
 
-  Swal.fire({ icon:"success", title:"Exemplo inserido!", confirmButtonColor:"#004aad" });
+  Swal.fire({ icon: "success", title: "Exemplo inserido!", confirmButtonColor: "#004aad" });
 }
 
-function resetNotify(){
+function resetNotify() {
   Swal.fire({
-    icon:"warning",
-    title: S.notifications.clearTitle,
-    text:"Isso apaga as preferencias desta aba neste navegador.",
-    showCancelButton:true,
-    confirmButtonText: S.common.clear,
-    confirmButtonColor:"#004aad",
-    cancelButtonText: S.common.cancel
-  }).then(async r=>{
-    if(!r.isConfirmed) return;
-    if(STORAGE_ENABLED){
+    icon: "warning",
+    title: SNotify.clearTitle || "Limpar notificações?",
+    text: "Isso apaga as preferências desta aba neste navegador.",
+    showCancelButton: true,
+    confirmButtonText: SCommon.clear || "Limpar",
+    confirmButtonColor: "#004aad",
+    cancelButtonText: SCommon.cancel || "Cancelar"
+  }).then(async r => {
+    if (!r.isConfirmed) return;
+    if (STORAGE_ENABLED) {
       storageRemove(NOTIFY_STORAGE_KEY);
-    }else{
+    } else {
       notifyCache = defaultNotify();
       await persistNotifyPreferences(notifyCache);
     }
     __notifyHydratedOnce = false;
     renderNotify();
-    Swal.fire({ icon:"success", title:"Pronto!", text:"Preferencias limpas.", confirmButtonColor:"#004aad" });
+    Swal.fire({ icon: "success", title: "Pronto!", text: "Preferências limpas.", confirmButtonColor: "#004aad" });
   });
 }
 
-function downloadNotifySummary(){
+function downloadNotifySummary() {
   const n = loadNotify() || defaultNotify();
 
   const channels = [];
-  if(n.channels.email) channels.push("E-mail");
-  if(n.channels.whatsapp) channels.push("WhatsApp");
-  if(n.channels.sms) channels.push("SMS");
-  if(n.channels.push) channels.push("Push");
+  if (n.channels.email) channels.push("E-mail");
+  if (n.channels.whatsapp) channels.push("WhatsApp");
+  if (n.channels.sms) channels.push("SMS");
+  if (n.channels.push) channels.push("Push");
 
   const types = [];
-  if(n.types.newJobs) types.push(S.notifications.typeNewJobs);
-  if(n.types.appUpdates) types.push("Atualizacao de status");
-  if(n.types.interview) types.push(S.notifications.typeInterviews);
-  if(n.types.messages) types.push("Mensagens do RH");
-  if(n.types.docs) types.push(S.notifications.typeDocs);
-  if(n.types.reminders) types.push(S.notifications.typeReminders);
+  if (n.types.newJobs) types.push(SNotify.typeNewJobs || "Novas vagas");
+  if (n.types.appUpdates) types.push("Atualização de status");
+  if (n.types.interview) types.push(SNotify.typeInterviews || "Entrevistas");
+  if (n.types.messages) types.push("Mensagens do RH");
+  if (n.types.docs) types.push(SNotify.typeDocs || "Documentos");
+  if (n.types.reminders) types.push(SNotify.typeReminders || "Lembretes");
 
   const lines = [];
-  lines.push("Liotecnica ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Resumo Notificacoes & Comunicacao (MVP)");
+  lines.push("Liotecnica | Resumo Notificações & Comunicação (MVP)");
   lines.push("Gerado em: " + new Date().toLocaleString("pt-BR"));
   lines.push("");
 
   lines.push("Canais:");
   lines.push("- Ativos: " + (channels.join(", ") || "Nenhum"));
-  lines.push("- Frequencia: " + (n.frequency || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"));
-  lines.push("- Idioma: " + (n.lang || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"));
-  lines.push("- E-mail: " + (n.emailAddr || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"));
-  lines.push("- Telefone: " + (n.phone || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"));
-  lines.push("- Autorizo contato (operacional): " + (n.allowContact ? S.notifications.allowContactYes : S.notifications.allowContactNo));
+  lines.push("- Frequência: " + (n.frequency || "Não informado"));
+  lines.push("- Idioma: " + (n.lang || "Não informado"));
+  lines.push("- E-mail: " + (n.emailAddr || "Não informado"));
+  lines.push("- Telefone: " + (n.phone || "Não informado"));
+  lines.push("- Autorizo contato (operacional): " + (n.allowContact ? (SNotify.allowContactYes || "Sim") : (SNotify.allowContactNo || "Não")));
   lines.push("");
 
   lines.push("Tipos de alerta:");
   lines.push("- " + (types.join(", ") || "Nenhum"));
   lines.push("");
 
-  lines.push("Horario silencioso:");
-  lines.push("- Ativo: " + (n.quiet.enabled || S.notifications.quietActiveFallback));
-  lines.push("- Inicio: " + (n.quiet.start || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"));
-  lines.push("- Fim: " + (n.quiet.end || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"));
-  lines.push("- Prioridade: " + (n.quiet.priority || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"));
+  lines.push("Horário silencioso:");
+  lines.push("- Ativo: " + (n.quiet.enabled || (SNotify.quietActiveFallback || "Não")));
+  lines.push("- Início: " + (n.quiet.start || "Não informado"));
+  lines.push("- Fim: " + (n.quiet.end || "Não informado"));
+  lines.push("- Prioridade: " + (n.quiet.priority || "Não informado"));
   lines.push("");
 
   lines.push("Assinatura:");
-  lines.push("- " + (n.signature || "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"));
+  lines.push("- " + (n.signature || "Não informado"));
 
-  const blob = new Blob([lines.join("\n")], { type:"text/plain;charset=utf-8" });
+  const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
   const dl = document.createElement("a");
   dl.href = URL.createObjectURL(blob);
   dl.download = "notificacoes-comunicacao-liotecnica.txt";
@@ -448,8 +461,8 @@ function downloadNotifySummary(){
   dl.remove();
 }
 
-function renderNotify(){
-  if(!STORAGE_ENABLED && !notifyLoaded){
+function renderNotify() {
+  if (!STORAGE_ENABLED && !notifyLoaded) {
     ensureNotifyLoaded().then(() => renderNotify());
     return;
   }
@@ -462,7 +475,7 @@ if (typeof window !== "undefined") {
   window.ensureNotifyLoaded = ensureNotifyLoaded;
 }
 
-(function normalizePortalStorage(){
+(function normalizePortalStorage() {
   const keys = [
     "liotec_portal_tests_v1",
     "liotec_portal_exp_proj_v1",
@@ -483,12 +496,13 @@ if (typeof window !== "undefined") {
 document.addEventListener("DOMContentLoaded", () => {
   loadProfileAvatar();
   const nameInput = document.getElementById("profileName");
-  if(nameInput){
+  if (nameInput) {
     nameInput.addEventListener("input", () => {
       const stored = storageGet(PROFILE_AVATAR_STORAGE_KEY);
-      if(!stored) setProfileAvatar("");
+      if (!stored) setProfileAvatar("");
       syncProfileAvatarMeta();
     });
   }
 });
 
+})();

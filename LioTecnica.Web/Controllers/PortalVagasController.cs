@@ -227,6 +227,34 @@ public sealed class PortalVagasController : Controller
     }
 
     [Authorize(AuthenticationSchemes = CandidateAuthDefaults.Scheme)]
+    [HttpGet("/PortalVagas/Profile/ResumePdf")]
+    public async Task<IActionResult> GetResumePdf(CancellationToken ct)
+    {
+        if (!TryGetCandidateContext(out var candidateId, out var tenantId, out var error))
+            return error;
+
+        var result = await _portalCandidatesApi.GetResumePdfAsync(tenantId, candidateId, ct);
+        if (!result.Success || result.Data is null)
+            return StatusCode((int)result.StatusCode, new { message = result.Message ?? "Falha ao gerar curriculo." });
+
+        return Ok(result.Data);
+    }
+
+    [Authorize(AuthenticationSchemes = CandidateAuthDefaults.Scheme)]
+    [HttpGet("/PortalVagas/Profile/ResumeHtml")]
+    public async Task<IActionResult> GetResumeHtml(CancellationToken ct)
+    {
+        if (!TryGetCandidateContext(out var candidateId, out var tenantId, out var error))
+            return error;
+
+        var result = await _portalCandidatesApi.GetResumeHtmlAsync(tenantId, candidateId, ct);
+        if (!result.Success || result.Data is null)
+            return StatusCode((int)result.StatusCode, new { message = result.Message ?? "Falha ao gerar curriculo." });
+
+        return Ok(result.Data);
+    }
+
+    [Authorize(AuthenticationSchemes = CandidateAuthDefaults.Scheme)]
     [HttpGet("/PortalVagas/SkillsPortfolio")]
     public async Task<IActionResult> GetSkillsPortfolio(CancellationToken ct)
     {

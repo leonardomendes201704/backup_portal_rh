@@ -1,7 +1,8 @@
 (function () {
-    if (window.PortalVagasJobs) return;
-    const S = window.PortalVagasStrings;
-    const heroGradients = [
+  if (window.PortalVagasJobs) return;
+
+  const S = window.PortalVagasStrings;
+  const heroGradients = [
     "linear-gradient(135deg, #1e3a8a, #0ea5e9)",
     "linear-gradient(135deg, #0f766e, #22c55e)",
     "linear-gradient(135deg, #7c3aed, #ec4899)",
@@ -11,9 +12,9 @@
   ];
 
   const sectionImageMap = [
-    { match: "industrial", title: "Industrial & ProduÃƒÂ§ÃƒÂ£o", image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=1600" },
+    { match: "industrial", title: "Industrial & Produção", image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=1600" },
     { match: "qualidade", title: "Qualidade & P&D", image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&q=80&w=1600" },
-    { match: "logistica", title: "LogÃƒÂ­stica & Supply", image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1600" },
+    { match: "logistica", title: "Logística & Supply", image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1600" },
     { match: "rh", title: "Administrativo & RH", image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1600" },
     { match: "administrativo", title: "Administrativo & RH", image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1600" },
     { match: "comercial", title: "Vendas & Marketing", image: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80&w=1600" },

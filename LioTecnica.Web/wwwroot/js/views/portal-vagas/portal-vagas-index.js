@@ -1,8 +1,8 @@
 /**
-         * IntenÃ§Ã£o:
-         * - Candidatura completa, com validaÃ§Ã£o e upload opcional.
-         * - Sem engolir erro: toda falha resulta em alerta visÃ­vel.
-         * - MantÃ©m a seleÃ§Ã£o da vaga atual para preencher o modal de candidatura.
+         * Intenção:
+         * - Candidatura completa, com validação e upload opcional.
+         * - Sem engolir erro: toda falha resulta em alerta visível.
+         * - Mantém a seleção da vaga atual para preencher o modal de candidatura.
          */
         (async function () {
           const ctx = window.PortalVagasIndexContext || {};
@@ -30,7 +30,7 @@
           const pageSize = 100;
           let totalItems = 0;
 
-          // MantÃ©m a vaga atual selecionada (para candidatura)
+          // Mantém a vaga atual selecionada (para candidatura)
           let currentJob = null;
 
           const jobsUi = window.PortalVagasJobs || {};
@@ -136,7 +136,7 @@
               if (window.PortalVagasApply?.open) {
                 await window.PortalVagasApply.open(
                   currentJob,
-                  `${currentJob.dataset.title} â€¢ ${currentJob.dataset.company} â€¢ ${currentJob.dataset.mode}`
+                  `${currentJob.dataset.title} • ${currentJob.dataset.company} • ${currentJob.dataset.mode}`
                 );
               }
             },
@@ -167,7 +167,7 @@
             window.PortalVagasApply?.init(ctx);
           } catch (err) {
             console.error(err);
-            showAppAlert("danger", "Ocorreu um erro ao carregar a pÃ¡gina. Recarregue e tente novamente.");
+            showAppAlert("danger", "Ocorreu um erro ao carregar a página. Recarregue e tente novamente.");
           }
         })();
     

@@ -13,6 +13,8 @@ using RhPortal.Api.Domain.Enums;
 using RhPortal.Api.Infrastructure.Data;
 using RhPortal.Api.Infrastructure.Localization;
 using RhPortal.Api.Infrastructure.Notifications;
+using RhPortal.Api.Infrastructure.Pdf;
+using RhPortal.Api.Infrastructure.Html;
 using RhPortal.Api.Infrastructure.Tenancy;
 
 namespace RhPortal.Api.Controllers;
@@ -74,6 +76,54 @@ public sealed class PortalCandidatesController : ControllerBase
             string.IsNullOrWhiteSpace(candidate.AvatarFileName) ? null : BuildAvatarUrl(candidate.Id),
             curriculo
         ));
+    }
+
+    /// <summary>
+    /// Gera o curriculo em PDF com todas as informacoes do perfil do candidato.
+    /// </summary>
+    [HttpGet("{id:guid}/resume-pdf")]
+    [ProducesResponseType(typeof(PortalCandidateResumePdfResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PortalCandidateResumePdfResponse>> GetResumePdf(
+        Guid id,
+        [FromServices] AppDbContext db,
+        [FromServices] CandidateResumePdfBuilder pdfBuilder,
+        CancellationToken ct)
+    {
+        var (candidate, data) = await LoadResumeDataAsync(db, id, ct);
+        if (candidate is null)
+            return NotFound(new { message = _localizer["ControllerErrors.CandidatoNotFound"] });
+
+        var pdfBytes = pdfBuilder.Build(data);
+        var fileName = $"curriculo_{NormalizeFileName(candidate.Nome)}.pdf";
+        var payload = new PortalCandidateResumePdfResponse(
+            fileName,
+            "application/pdf",
+            Convert.ToBase64String(pdfBytes)
+        );
+
+        return Ok(payload);
+    }
+
+    /// <summary>
+    /// Gera o curriculo em HTML com todas as informacoes do perfil do candidato.
+    /// </summary>
+    [HttpGet("{id:guid}/resume-html")]
+    [ProducesResponseType(typeof(PortalCandidateResumeHtmlResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PortalCandidateResumeHtmlResponse>> GetResumeHtml(
+        Guid id,
+        [FromServices] AppDbContext db,
+        [FromServices] CandidateResumeHtmlBuilder htmlBuilder,
+        CancellationToken ct)
+    {
+        var (candidate, data) = await LoadResumeDataAsync(db, id, ct);
+        if (candidate is null)
+            return NotFound(new { message = _localizer["ControllerErrors.CandidatoNotFound"] });
+
+        var html = htmlBuilder.Build(data);
+        var fileName = $"curriculo_{NormalizeFileName(candidate.Nome)}.html";
+        return Ok(new PortalCandidateResumeHtmlResponse(fileName, html));
     }
 
     /// <summary>
@@ -2107,6 +2157,128 @@ public sealed class PortalCandidatesController : ControllerBase
     {
         var trimmed = (value ?? string.Empty).Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    private static string NormalizeFileName(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return "candidato";
+
+        foreach (var ch in System.IO.Path.GetInvalidFileNameChars())
+            trimmed = trimmed.Replace(ch, '_');
+
+        return string.IsNullOrWhiteSpace(trimmed) ? "candidato" : trimmed;
+    }
+
+    private static async Task<(Candidato? Candidate, CandidateResumeData Data)> LoadResumeDataAsync(
+        AppDbContext db,
+        Guid id,
+        CancellationToken ct)
+    {
+        var candidate = await db.Candidatos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (candidate is null)
+            return (null, default!);
+
+        var skills = await db.CandidatoCompetencias
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var certifications = await db.CandidatoCertificacoes
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var portfolio = await db.CandidatoPortfolios
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var educationSummary = await db.CandidatoEducacaoResumos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var educationItems = await db.CandidatoEducacaoItens
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var experiences = await db.CandidatoExperiencias
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var projects = await db.CandidatoProjetos
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var preferences = await db.CandidatoPreferenciasVaga
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var documents = await db.CandidatoDocumentos
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var references = await db.CandidatoReferencias
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var accessibility = await db.CandidatoAcessibilidades
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var agendaPreferences = await db.CandidatoAgendaPreferencias
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var agendaBlocks = await db.CandidatoAgendaBloqueios
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var notificationPreferences = await db.CandidatoNotificacaoPreferencias
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var lgpdConsent = await db.CandidatoLgpdConsents
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var data = new CandidateResumeData(
+            candidate,
+            skills,
+            certifications,
+            portfolio,
+            educationSummary,
+            educationItems,
+            experiences,
+            projects,
+            preferences,
+            documents,
+            references,
+            accessibility,
+            agendaPreferences,
+            agendaBlocks,
+            notificationPreferences,
+            lgpdConsent
+        );
+
+        return (candidate, data);
     }
 
     private static async Task NotifyProfileUpdatedAsync(

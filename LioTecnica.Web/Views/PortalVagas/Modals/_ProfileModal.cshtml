@@ -5,9 +5,17 @@
                 <div class="modal-header">
                     <div>
                         <h2 class="modal-title h5 mb-0" id="profileModalLabel">Meu perfil</h2>
-                        <div class="text-secondary small">Atualize seus dados basicos e acompanhe o preenchimento das seções.</div>
+                        <div class="text-secondary small">Atualize seus dados básicos e acompanhe o preenchimento das seções.</div>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    <div class="ms-auto d-flex align-items-center gap-2">
+                        <button id="profileViewHtmlBtn" class="btn btn-outline-secondary btn-sm" type="button">
+                            <i class="bi bi-eye me-1"></i>Visualizar curriculo
+                        </button>
+                        <button id="profileDownloadPdfBtn" class="btn btn-outline-primary btn-sm" type="button">
+                            <i class="bi bi-file-earmark-pdf me-1"></i>Baixar curriculo
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
                 </div>
 
                 <div class="modal-body">
@@ -19,7 +27,6 @@
                                     <div class="fw-semibold">Dados do candidato</div>
                                 </div>
 
-                                <!-- Conteúdo -->
                                 <div class="row g-3 flex-grow-1">
                                     <div class="col-12">
                                         <label for="profileName" class="form-label">Nome completo</label>
@@ -30,7 +37,7 @@
                                     <div class="col-12">
                                         <label for="profileEmail" class="form-label">E-mail</label>
                                         <input id="profileEmail" class="form-control" type="email" value="" readonly />
-                                        <div class="form-text">O e-mail nao pode ser alterado.</div>
+                                        <div class="form-text">O e-mail não pode ser alterado.</div>
                                     </div>
 
                                     <div class="col-12 col-md-6">
@@ -55,18 +62,15 @@
                                         <div class="invalid-feedback">Selecione a cidade.</div>
                                     </div>
 
-                                    <!-- Empurra a LGPD pro final do card, se sobrar altura -->
                                     <div class="col-12 mt-auto">
                                         <div class="small text-secondary">
-                                            <i class="bi bi-shield-lock me-1"></i>Seus dados sao tratados de acordo com a LGPD.
+                                            <i class="bi bi-shield-lock me-1"></i>Seus dados são tratados de acordo com a LGPD.
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Coluna: seções (cards) -->
-                        <!-- Coluna: seções (cards) - 100% altura como a esquerda -->
                         <div class="col-12 col-lg-7 d-flex" id="profileSectionsCol">
                             <div class="sections-panel flex-fill d-flex flex-column">
                                 <div id="profileSectionsCards" class="profile-sections-cards flex-grow-1">
@@ -75,7 +79,6 @@
 
                                 <div id="profileSectionsContent" class="profile-sections-content flex-grow-1 d-none">
                                     <div class="tab-content" id="profileTabsContent">
-                                        <!-- Aba: Perfil -->
                                         @await Html.PartialAsync("Sections/_TabProfileSection")
                                         @await Html.PartialAsync("Sections/_TabTestsSection")
                                         @await Html.PartialAsync("Sections/_TabExperienceSection")

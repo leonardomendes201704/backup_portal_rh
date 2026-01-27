@@ -138,6 +138,58 @@ public sealed class PortalCandidatesApiClient
         return PortalApiResult<PortalCandidateDocumentoSummary>.Fail(res.StatusCode, message ?? "Falha ao enviar curriculo.");
     }
 
+    public async Task<PortalApiResult<PortalCandidateResumePdfResponse>> GetResumePdfAsync(
+        string tenantId,
+        Guid candidateId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return PortalApiResult<PortalCandidateResumePdfResponse>.Fail(System.Net.HttpStatusCode.BadRequest, "Tenant nao informado.");
+
+        var url = $"api/public/portal-candidates/{candidateId}/resume-pdf?tenantId={Uri.EscapeDataString(tenantId)}";
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenantId);
+
+        using var res = await _http.SendAsync(req, ct);
+        if (res.IsSuccessStatusCode)
+        {
+            var data = await res.Content.ReadFromJsonAsync<PortalCandidateResumePdfResponse>(cancellationToken: ct);
+            if (data is not null)
+                return PortalApiResult<PortalCandidateResumePdfResponse>.Ok(data);
+
+            return PortalApiResult<PortalCandidateResumePdfResponse>.Fail(res.StatusCode, "Resposta invalida da API.");
+        }
+
+        var message = await TryReadMessageAsync(res, ct);
+        return PortalApiResult<PortalCandidateResumePdfResponse>.Fail(res.StatusCode, message ?? "Falha ao gerar curriculo.");
+    }
+
+    public async Task<PortalApiResult<PortalCandidateResumeHtmlResponse>> GetResumeHtmlAsync(
+        string tenantId,
+        Guid candidateId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return PortalApiResult<PortalCandidateResumeHtmlResponse>.Fail(System.Net.HttpStatusCode.BadRequest, "Tenant nao informado.");
+
+        var url = $"api/public/portal-candidates/{candidateId}/resume-html?tenantId={Uri.EscapeDataString(tenantId)}";
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenantId);
+
+        using var res = await _http.SendAsync(req, ct);
+        if (res.IsSuccessStatusCode)
+        {
+            var data = await res.Content.ReadFromJsonAsync<PortalCandidateResumeHtmlResponse>(cancellationToken: ct);
+            if (data is not null)
+                return PortalApiResult<PortalCandidateResumeHtmlResponse>.Ok(data);
+
+            return PortalApiResult<PortalCandidateResumeHtmlResponse>.Fail(res.StatusCode, "Resposta invalida da API.");
+        }
+
+        var message = await TryReadMessageAsync(res, ct);
+        return PortalApiResult<PortalCandidateResumeHtmlResponse>.Fail(res.StatusCode, message ?? "Falha ao gerar curriculo.");
+    }
+
     public async Task<PortalApiResult<PortalCandidateSkillsPortfolioResponse>> GetSkillsPortfolioAsync(
         string tenantId,
         Guid candidateId,

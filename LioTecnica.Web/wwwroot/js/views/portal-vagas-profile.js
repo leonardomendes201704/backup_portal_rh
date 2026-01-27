@@ -23,6 +23,8 @@
   const userName = document.getElementById("portalUserName");
   const userEmail = document.getElementById("portalUserEmail");
   const userAvatar = document.getElementById("portalUserAvatar");
+  const downloadPdfBtn = document.getElementById("profileDownloadPdfBtn");
+  const viewHtmlBtn = document.getElementById("profileViewHtmlBtn");
 
   if (!btnProfile || !modalEl || !form || !saveBtn || !window.bootstrap) return;
 
@@ -44,6 +46,22 @@
     if (!saveBtn) return;
     saveBtn.disabled = isLoading;
     saveBtn.textContent = isLoading ? "Salvando..." : "Salvar";
+  };
+
+  const setDownloadLoading = (isLoading) => {
+    if (!downloadPdfBtn) return;
+    downloadPdfBtn.disabled = isLoading;
+    downloadPdfBtn.innerHTML = isLoading
+      ? `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Aguarde...`
+      : `<i class="bi bi-file-earmark-pdf me-1"></i>Baixar curriculo`;
+  };
+
+  const setViewLoading = (isLoading) => {
+    if (!viewHtmlBtn) return;
+    viewHtmlBtn.disabled = isLoading;
+    viewHtmlBtn.innerHTML = isLoading
+      ? `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Aguarde...`
+      : `<i class="bi bi-eye me-1"></i>Visualizar curriculo`;
   };
 
   const digitsOnly = (value) => (value || "").replace(/\D/g, "");
@@ -158,6 +176,21 @@
     return d.toLocaleString("pt-BR");
   };
 
+  const base64ToBlob = (base64, contentType) => {
+    const sliceSize = 1024;
+    const byteChars = atob(base64);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteChars.length; offset += sliceSize) {
+      const slice = byteChars.slice(offset, offset + sliceSize);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      byteArrays.push(new Uint8Array(byteNumbers));
+    }
+    return new Blob(byteArrays, { type: contentType || "application/pdf" });
+  };
+
   const setAvatar = (url, name) => {
     if (avatarName) avatarName.textContent = name || "";
     if (!avatarImg || !avatarFallback) return;
@@ -182,6 +215,77 @@
     }
     cvName.textContent = curriculo.nomeArquivo || "";
     cvDate.textContent = curriculo.createdAtUtc ? `Enviado em ${formatDateTimeBr(curriculo.createdAtUtc)}` : "";
+  };
+
+  const downloadResumePdf = async () => {
+    if (!downloadPdfBtn) return;
+    setDownloadLoading(true);
+    try {
+      const response = await fetch("/PortalVagas/Profile/ResumePdf", {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+        credentials: "same-origin"
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showSwal("error", "Nao foi possivel gerar o PDF", data.message || "Tente novamente.");
+        return;
+      }
+      const base64 = data.base64 || data.Base64;
+      if (!base64) {
+        showSwal("error", "PDF indisponivel", "Conteudo nao retornado.");
+        return;
+      }
+      const blob = base64ToBlob(base64, data.contentType || data.ContentType);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.fileName || data.FileName || "curriculo.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      showSwal("error", "Falha ao baixar", "Tente novamente.");
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
+  const openResumeHtml = async () => {
+    if (!viewHtmlBtn) return;
+    setViewLoading(true);
+    try {
+      const response = await fetch("/PortalVagas/Profile/ResumeHtml", {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+        credentials: "same-origin"
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showSwal("error", "Nao foi possivel gerar o curriculo", data.message || "Tente novamente.");
+        return;
+      }
+      const html = data.html || data.Html;
+      if (!html) {
+        showSwal("error", "Curriculo indisponivel", "Conteudo nao retornado.");
+        return;
+      }
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank", "noopener");
+      if (!win) {
+        showSwal("warning", "Pop-up bloqueado", "Permita pop-ups para visualizar o curriculo.");
+        return;
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+      console.error(err);
+      showSwal("error", "Falha ao abrir", "Tente novamente.");
+    } finally {
+      setViewLoading(false);
+    }
   };
 
   const loadProfile = async () => {
@@ -230,6 +334,18 @@
       showSwal("error", "Erro inesperado", "Tente novamente em alguns instantes.");
     }
   });
+
+  if (downloadPdfBtn) {
+    downloadPdfBtn.addEventListener("click", () => {
+      downloadResumePdf();
+    });
+  }
+
+  if (viewHtmlBtn) {
+    viewHtmlBtn.addEventListener("click", () => {
+      openResumeHtml();
+    });
+  }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
