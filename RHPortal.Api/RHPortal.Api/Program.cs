@@ -77,7 +77,9 @@ builder.Services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache();
 builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
+builder.Services.Configure<PortalJobMatchOptions>(builder.Configuration.GetSection("PortalJobMatch"));
 builder.Services.PostConfigure<OpenAIOptions>(options =>
 {
     var envKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
@@ -270,6 +272,8 @@ builder.Services.AddScoped<AgendaService>();
 builder.Services.AddScoped<IPortalCandidateAuthService, PortalCandidateAuthService>();
 builder.Services.AddScoped<IPasswordHasher<Candidato>, PasswordHasher<Candidato>>();
 builder.Services.AddScoped<ILocalizationConfigService, LocalizationConfigService>();
+builder.Services.AddScoped<IProfileCompletionService, ProfileCompletionService>();
+builder.Services.AddScoped<IPortalJobMatchService, PortalJobMatchService>();
 
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<UserAdministrationService>();

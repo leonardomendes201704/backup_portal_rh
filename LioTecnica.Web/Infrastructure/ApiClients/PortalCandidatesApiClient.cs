@@ -40,6 +40,58 @@ public sealed class PortalCandidatesApiClient
         return PortalApiResult<PortalCandidateProfileResponse>.Fail(res.StatusCode, message ?? "Falha ao carregar perfil.");
     }
 
+    public async Task<PortalApiResult<PortalCandidateProfileCompletionResponse>> GetProfileCompletionAsync(
+        string tenantId,
+        Guid candidateId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return PortalApiResult<PortalCandidateProfileCompletionResponse>.Fail(System.Net.HttpStatusCode.BadRequest, "Tenant nao informado.");
+
+        var url = $"api/public/portal-candidates/{candidateId}/profile-completion?tenantId={Uri.EscapeDataString(tenantId)}";
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenantId);
+
+        using var res = await _http.SendAsync(req, ct);
+        if (res.IsSuccessStatusCode)
+        {
+            var data = await res.Content.ReadFromJsonAsync<PortalCandidateProfileCompletionResponse>(cancellationToken: ct);
+            if (data is not null)
+                return PortalApiResult<PortalCandidateProfileCompletionResponse>.Ok(data);
+
+            return PortalApiResult<PortalCandidateProfileCompletionResponse>.Fail(res.StatusCode, "Resposta invalida da API.");
+        }
+
+        var message = await TryReadMessageAsync(res, ct);
+        return PortalApiResult<PortalCandidateProfileCompletionResponse>.Fail(res.StatusCode, message ?? "Falha ao calcular percentuais.");
+    }
+
+    public async Task<PortalApiResult<PortalCandidateJobMatchResponse>> GetJobMatchesAsync(
+        string tenantId,
+        Guid candidateId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return PortalApiResult<PortalCandidateJobMatchResponse>.Fail(System.Net.HttpStatusCode.BadRequest, "Tenant nao informado.");
+
+        var url = $"api/public/portal-candidates/{candidateId}/job-matches?tenantId={Uri.EscapeDataString(tenantId)}";
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenantId);
+
+        using var res = await _http.SendAsync(req, ct);
+        if (res.IsSuccessStatusCode)
+        {
+            var data = await res.Content.ReadFromJsonAsync<PortalCandidateJobMatchResponse>(cancellationToken: ct);
+            if (data is not null)
+                return PortalApiResult<PortalCandidateJobMatchResponse>.Ok(data);
+
+            return PortalApiResult<PortalCandidateJobMatchResponse>.Fail(res.StatusCode, "Resposta invalida da API.");
+        }
+
+        var message = await TryReadMessageAsync(res, ct);
+        return PortalApiResult<PortalCandidateJobMatchResponse>.Fail(res.StatusCode, message ?? "Falha ao calcular aderencia das vagas.");
+    }
+
     public async Task<PortalApiResult<PortalCandidateProfileResponse>> UpdateProfileAsync(
         string tenantId,
         Guid candidateId,

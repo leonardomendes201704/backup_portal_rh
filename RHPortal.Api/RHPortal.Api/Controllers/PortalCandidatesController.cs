@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,18 +8,21 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using RhPortal.Api.Application.Candidatos;
+using RhPortal.Api.Application.Portal;
 using RhPortal.Api.Application.ResumeParsing;
 using RhPortal.Api.Contracts.Notifications;
 using RhPortal.Api.Contracts.Candidates;
 using RhPortal.Api.Contracts.Portal;
 using RhPortal.Api.Domain.Entities;
 using RhPortal.Api.Domain.Enums;
+using RHPortal.Api.Domain.Enums;
 using RhPortal.Api.Infrastructure.Data;
 using RhPortal.Api.Infrastructure.Localization;
 using RhPortal.Api.Infrastructure.Notifications;
 using RhPortal.Api.Infrastructure.Pdf;
 using RhPortal.Api.Infrastructure.Html;
 using RhPortal.Api.Infrastructure.Tenancy;
+using RhPortal.Api.Application.Portal;
 
 namespace RhPortal.Api.Controllers;
 
@@ -80,6 +84,523 @@ public sealed class PortalCandidatesController : ControllerBase
             curriculo
         ));
     }
+
+    /// <summary>
+    /// Calcula os percentuais de preenchimento do perfil usando IA.
+    /// </summary>
+    [HttpGet("{id:guid}/profile-completion")]
+    [ProducesResponseType(typeof(PortalCandidateProfileCompletionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PortalCandidateProfileCompletionResponse>> GetProfileCompletion(
+        Guid id,
+        [FromServices] AppDbContext db,
+        [FromServices] IProfileCompletionService completionService,
+        CancellationToken ct)
+    {
+        var candidate = await db.Candidatos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (candidate is null)
+            return NotFound(new { message = _localizer["ControllerErrors.CandidatoNotFound"] });
+
+        var educationSummary = await db.CandidatoEducacaoResumos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var educationItems = await db.CandidatoEducacaoItens
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.Curso,
+                x.Instituicao,
+                x.Tipo,
+                x.Status,
+                x.Inicio,
+                x.Fim,
+                x.Observacoes,
+                x.Link
+            })
+            .ToListAsync(ct);
+
+        var experiences = await db.CandidatoExperiencias
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.Empresa,
+                x.Cargo,
+                x.Inicio,
+                x.Fim,
+                x.Local,
+                x.Atividades
+            })
+            .ToListAsync(ct);
+
+        var projects = await db.CandidatoProjetos
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.Nome,
+                x.Periodo,
+                x.Descricao,
+                x.Link,
+                x.Stack,
+                x.Destaques
+            })
+            .ToListAsync(ct);
+
+        var skills = await db.CandidatoCompetencias
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.Tipo,
+                x.Nome,
+                x.Nivel,
+                x.Evidencia
+            })
+            .ToListAsync(ct);
+
+        var certifications = await db.CandidatoCertificacoes
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.Nome,
+                x.Instituicao,
+                x.Ano,
+                x.Link
+            })
+            .ToListAsync(ct);
+
+        var portfolio = await db.CandidatoPortfolios
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.WorkModel,
+                x.Availability,
+                x.Salary,
+                x.Shift,
+                x.Note,
+                x.Linkedin,
+                x.Github,
+                x.Portfolio,
+                x.Drive,
+                x.Tags
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var documents = await db.CandidatoDocumentos
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.Tipo,
+                x.NomeArquivo,
+                x.TamanhoBytes,
+                x.CreatedAtUtc
+            })
+            .ToListAsync(ct);
+
+        var references = await db.CandidatoReferencias
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.Nome,
+                x.Relacao,
+                x.Empresa,
+                x.Cargo,
+                x.Contato,
+                x.Periodo,
+                x.Linkedin,
+                x.Observacoes,
+                x.PodeContatar
+            })
+            .ToListAsync(ct);
+
+        var accessibility = await db.CandidatoAcessibilidades
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var preferences = await db.CandidatoPreferenciasVaga
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new
+            {
+                x.CargoAlvo,
+                x.Senioridade,
+                x.InicioDisponivel,
+                x.Resumo,
+                x.AreasInteresse,
+                x.ModeloTrabalho,
+                x.Jornada,
+                x.TipoContrato,
+                x.Viagens,
+                x.Mudanca,
+                x.CidadePreferida,
+                x.DistanciaMaxKm,
+                x.ObsDeslocamento,
+                x.PretensaoSalarial,
+                x.PretensaoNegociavel,
+                x.BeneficiosDesejados,
+                x.NaoAbreMaoDe
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var lgpd = await db.CandidatoLgpdConsents
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var agendaPref = await db.CandidatoAgendaPreferencias
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var agendaBlocks = await db.CandidatoAgendaBloqueios
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new { x.Tipo, x.Titulo, x.Data, x.Horario, x.Observacoes })
+            .ToListAsync(ct);
+
+        var notify = await db.CandidatoNotificacaoPreferencias
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var historyCount = await db.CandidatoStatusHistories
+            .AsNoTracking()
+            .CountAsync(x => x.CandidatoId == id, ct);
+
+        var snapshot = new
+        {
+            candidate = new
+            {
+                candidate.Nome,
+                candidate.Email,
+                candidate.Fone,
+                candidate.Cidade,
+                candidate.Uf,
+                candidate.LinkedinUrl,
+                candidate.ResumoProfissional,
+                avatar = string.IsNullOrWhiteSpace(candidate.AvatarFileName) ? null : candidate.AvatarFileName
+            },
+            education = new
+            {
+                summary = educationSummary is null ? null : new
+                {
+                    educationSummary.Nivel,
+                    educationSummary.AreaPrincipal,
+                    educationSummary.Situacao,
+                    educationSummary.Destaques
+                },
+                items = educationItems
+            },
+            experience = new
+            {
+                items = experiences,
+                projects
+            },
+            skills,
+            certifications,
+            portfolio,
+            documents,
+            references,
+            accessibility,
+            preferences,
+            lgpd,
+            agenda = new
+            {
+                preferences = agendaPref,
+                blocks = agendaBlocks
+            },
+            notifications = notify,
+            history = new { count = historyCount }
+        };
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(60));
+
+        try
+        {
+            var result = await completionService.ComputeAsync(snapshot, timeoutCts.Token);
+            var suggestions = result.Suggestions
+                .Select(s => new PortalCandidateProfileCompletionSuggestion(s.Section, s.Text, s.Impact))
+                .ToList();
+
+            return Ok(new PortalCandidateProfileCompletionResponse(
+                result.Sections,
+                result.Overall,
+                result.Warnings,
+                result.Evidence,
+                suggestions));
+        }
+        catch (TaskCanceledException)
+        {
+            return StatusCode(StatusCodes.Status504GatewayTimeout, new { message = "Tempo excedido ao calcular percentuais." });
+        }
+    }
+
+    /// <summary>
+    /// Calcula score de aderencia entre candidato e vagas abertas usando IA.
+    /// </summary>
+    [HttpGet("{id:guid}/job-matches")]
+    [ProducesResponseType(typeof(PortalCandidateJobMatchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PortalCandidateJobMatchResponse>> GetJobMatches(
+        Guid id,
+        [FromServices] AppDbContext db,
+        [FromServices] ITenantContext tenantContext,
+        [FromServices] IPortalJobMatchService matchService,
+        [FromServices] IOptions<PortalJobMatchOptions> matchOptions,
+        [FromServices] IMemoryCache cache,
+        CancellationToken ct)
+    {
+        var options = matchOptions.Value;
+        if (!options.Enabled)
+            return Ok(new PortalCandidateJobMatchResponse(Array.Empty<PortalCandidateJobMatchItem>()));
+
+        var candidate = await db.Candidatos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (candidate is null)
+            return NotFound(new { message = _localizer["ControllerErrors.CandidatoNotFound"] });
+
+        var uf = candidate.Uf?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(uf))
+            return Ok(new PortalCandidateJobMatchResponse(Array.Empty<PortalCandidateJobMatchItem>()));
+
+        var skills = await db.CandidatoCompetencias
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new { x.Tipo, x.Nome, x.Nivel, x.Evidencia })
+            .ToListAsync(ct);
+
+        var experiences = await db.CandidatoExperiencias
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new { x.Empresa, x.Cargo, x.Inicio, x.Fim, x.Local, x.Atividades })
+            .ToListAsync(ct);
+
+        var educationSummary = await db.CandidatoEducacaoResumos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var educationItems = await db.CandidatoEducacaoItens
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new { x.Curso, x.Instituicao, x.Tipo, x.Status, x.Inicio, x.Fim, x.Observacoes })
+            .ToListAsync(ct);
+
+        var certifications = await db.CandidatoCertificacoes
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new { x.Nome, x.Instituicao, x.Ano, x.Link })
+            .ToListAsync(ct);
+
+        var portfolio = await db.CandidatoPortfolios
+            .AsNoTracking()
+            .Where(x => x.CandidatoId == id)
+            .Select(x => new { x.WorkModel, x.Availability, x.Salary, x.Shift, x.Note, x.Linkedin, x.Github, x.Portfolio, x.Drive, x.Tags })
+            .FirstOrDefaultAsync(ct);
+
+        var preferences = await db.CandidatoPreferenciasVaga
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CandidatoId == id, ct);
+
+        var maxVagas = options.MaxVagas <= 0 ? 50 : options.MaxVagas;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var vagas = await db.Vagas
+            .AsNoTracking()
+            .Include(v => v.Area)
+            .Include(v => v.Requisitos)
+            .Where(v => v.Status == VagaStatus.Aberta)
+            .Where(v => !v.Confidencial)
+            .Where(v => v.Visibilidade == VagaPublicacaoVisibilidade.Externa
+                || v.Visibilidade == VagaPublicacaoVisibilidade.InternaEExterna)
+            .Where(v => !v.DataInicio.HasValue || v.DataInicio.Value <= today)
+            .Where(v => !v.DataEncerramento.HasValue || v.DataEncerramento.Value >= today)
+            .Where(v => v.Uf != null && v.Uf.ToUpper() == uf)
+            .OrderByDescending(v => v.CreatedAtUtc)
+            .Take(maxVagas)
+            .Select(v => new JobMatchVagaSnapshot(
+                v.Id,
+                v.Titulo,
+                v.Area != null ? v.Area.Name : null,
+                v.Modalidade,
+                v.TipoContratacao,
+                v.Senioridade,
+                v.Cidade,
+                v.Uf,
+                v.SalarioMinimo,
+                v.SalarioMaximo,
+                v.ResumoPitch,
+                v.DescricaoPublica,
+                v.TagsKeywordsRaw,
+                v.TagsStackRaw,
+                v.TagsResponsabilidadesRaw,
+                v.Escolaridade,
+                v.FormacaoArea,
+                v.ExperienciaMinimaAnos,
+                v.TagsIdiomasRaw,
+                v.Diferenciais,
+                v.Requisitos.Select(r => new JobMatchRequisitoSnapshot(
+                    r.Nome,
+                    r.Categoria,
+                    r.Peso,
+                    r.Obrigatorio,
+                    r.AnosMinimos,
+                    r.Nivel,
+                    r.Avaliacao,
+                    r.SinonimosRaw
+                )).ToList()
+            ))
+            .ToListAsync(ct);
+
+        if (vagas.Count == 0)
+            return Ok(new PortalCandidateJobMatchResponse(Array.Empty<PortalCandidateJobMatchItem>()));
+
+        var vagasPayload = vagas.ToList();
+        var snapshot = new
+        {
+            candidate = new
+            {
+                candidate.Nome,
+                candidate.Email,
+                candidate.Fone,
+                candidate.Cidade,
+                candidate.Uf,
+                candidate.LinkedinUrl,
+                candidate.ResumoProfissional
+            },
+            education = new
+            {
+                summary = educationSummary is null ? null : new
+                {
+                    educationSummary.Nivel,
+                    educationSummary.AreaPrincipal,
+                    educationSummary.Situacao,
+                    educationSummary.Destaques
+                },
+                items = educationItems
+            },
+            experience = experiences,
+            skills,
+            certifications,
+            portfolio,
+            preferences,
+            jobs = vagasPayload
+        };
+
+        try
+        {
+            if (options.CacheEnabled)
+            {
+                var vagasUpdatedAt = await db.Vagas
+                    .AsNoTracking()
+                    .Where(v => v.Status == VagaStatus.Aberta)
+                    .Where(v => !v.Confidencial)
+                    .Where(v => v.Visibilidade == VagaPublicacaoVisibilidade.Externa
+                        || v.Visibilidade == VagaPublicacaoVisibilidade.InternaEExterna)
+                    .Where(v => !v.DataInicio.HasValue || v.DataInicio.Value <= today)
+                    .Where(v => !v.DataEncerramento.HasValue || v.DataEncerramento.Value >= today)
+                    .Where(v => v.Uf != null && v.Uf.ToUpper() == uf)
+                    .OrderByDescending(v => v.UpdatedAtUtc)
+                    .Select(v => v.UpdatedAtUtc)
+                    .FirstOrDefaultAsync(ct);
+
+                var cacheKey = $"jobmatch:{tenantContext.TenantId}:{id}:{uf}:{maxVagas}:{candidate.UpdatedAtUtc.UtcTicks}:{vagasUpdatedAt.UtcTicks}:{options.IncludeReasons}";
+                if (cache.TryGetValue(cacheKey, out PortalCandidateJobMatchResponse cached))
+                    return Ok(cached);
+
+                var response = await ComputeMatchesAsync(snapshot, vagasPayload, matchService, options, ct);
+                cache.Set(cacheKey, response, TimeSpan.FromMinutes(Math.Max(1, options.CacheMinutes)));
+                return Ok(response);
+            }
+
+            var fresh = await ComputeMatchesAsync(snapshot, vagasPayload, matchService, options, ct);
+            return Ok(fresh);
+        }
+        catch (TaskCanceledException)
+        {
+            return StatusCode(StatusCodes.Status504GatewayTimeout, new { message = "Tempo excedido ao calcular aderencia das vagas." });
+        }
+        catch (OpenAIServiceException ex)
+        {
+            return StatusCode(ex.StatusCode, new { message = ex.Message });
+        }
+    }
+
+    private static async Task<PortalCandidateJobMatchResponse> ComputeMatchesAsync(
+        object snapshot,
+        IReadOnlyList<JobMatchVagaSnapshot> vagas,
+        IPortalJobMatchService matchService,
+        PortalJobMatchOptions options,
+        CancellationToken ct)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var timeoutSeconds = options.TimeoutSeconds <= 0 ? 20 : options.TimeoutSeconds;
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
+        var result = await matchService.ComputeAsync(snapshot, options.IncludeReasons, timeoutCts.Token);
+        var vagasById = vagas.ToDictionary(v => v.Id);
+        var items = result.Matches
+            .Where(m => m.Score > 0)
+            .Select(m =>
+            {
+                vagasById.TryGetValue(m.VagaId, out var vaga);
+                return new PortalCandidateJobMatchItem(
+                    m.VagaId,
+                    m.Score,
+                    vaga?.Titulo,
+                    vaga?.Area,
+                    vaga?.Cidade,
+                    vaga?.Uf,
+                    vaga?.Modalidade?.ToString(),
+                    vaga?.Senioridade?.ToString(),
+                    options.IncludeReasons ? m.Reason : null);
+            })
+            .ToList();
+
+        return new PortalCandidateJobMatchResponse(items);
+    }
+
+    private sealed record JobMatchVagaSnapshot(
+        Guid Id,
+        string Titulo,
+        string? Area,
+        VagaModalidade? Modalidade,
+        VagaTipoContratacao? TipoContratacao,
+        VagaSenioridade? Senioridade,
+        string? Cidade,
+        string? Uf,
+        decimal? SalarioMinimo,
+        decimal? SalarioMaximo,
+        string? ResumoPitch,
+        string? DescricaoPublica,
+        string? TagsKeywordsRaw,
+        string? TagsStackRaw,
+        string? TagsResponsabilidadesRaw,
+        VagaEscolaridade? Escolaridade,
+        VagaFormacaoArea? FormacaoArea,
+        int? ExperienciaMinimaAnos,
+        string? TagsIdiomasRaw,
+        string? Diferenciais,
+        List<JobMatchRequisitoSnapshot> Requisitos);
+
+    private sealed record JobMatchRequisitoSnapshot(
+        string Nome,
+        string? Categoria,
+        VagaPeso Peso,
+        bool Obrigatorio,
+        int? AnosMinimos,
+        VagaRequisitoNivel? Nivel,
+        VagaRequisitoAvaliacao? Avaliacao,
+        string? SinonimosRaw);
 
     /// <summary>
     /// Gera o curriculo em PDF com todas as informacoes do perfil do candidato.

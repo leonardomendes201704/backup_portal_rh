@@ -92,15 +92,16 @@
                                         @await Html.PartialAsync("Sections/_TabAgendaSection")
                                         @await Html.PartialAsync("Sections/_TabAppsSection")
                                         @await Html.PartialAsync("Sections/_TabNotifySection")
-                                        <div class="modal-footer">
-                                            <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
-                                            <button id="profileSaveBtn" class="btn btn-primary" type="submit">Salvar</button>
-                                        </div>
+                                        @await Html.PartialAsync("Sections/_TabJobMatchesSection")
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                    <button id="profileSaveBtn" class="btn btn-primary" type="submit">Salvar</button>
                 </div>
             </form>
         </div>

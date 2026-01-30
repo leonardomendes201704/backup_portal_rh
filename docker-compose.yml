@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: rhportal-db
+    environment:
+      POSTGRES_DB: bddev
+      POSTGRES_USER: sysdba
+      POSTGRES_PASSWORD: localdevpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - rhportal_db:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: RHPortal.Api/Dockerfile
+    container_name: rhportal-api
+    depends_on:
+      - db
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: Host=db;Port=5432;Database=bddev;Username=sysdba;Password=localdevpass
+      OpenAI__ApiKey: ${OPENAI_API_KEY}
+      OpenAI__BaseUrl: https://api.openai.com/v1/
+      OpenAI__Model: gpt-4o-mini
+      OpenAI__TimeoutSeconds: 60
+      OpenAI__MaxFileSizeBytes: 10485760
+      OpenAI__AllowedExtensions__0: .pdf
+      OpenAI__AllowedExtensions__1: .docx
+      Seed__Enabled: "true"
+      Seed__Vagas__Enabled: "true"
+      Seed__Candidatos__Enabled: "true"
+      Seed__InboxItems__Enabled: "true"
+      Seed__Candidatos__DefaultPassword: "Mudar123@"
+      Cors__WebOrigin: http://localhost:8080
+    ports:
+      - "7073:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: liotecnica-web
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Development
+      Endpoints__RhApi: http://api:8080/
+      Endpoints__RhApiPublic: http://localhost:7073/
+    ports:
+      - "8080:8080"
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    ports:
+      - "9999:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  rhportal_db:

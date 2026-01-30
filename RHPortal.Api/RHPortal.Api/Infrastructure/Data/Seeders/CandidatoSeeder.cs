@@ -14,6 +14,8 @@ public static class CandidatoSeeder
         string emailDomain,
         int targetCount,
         int perVaga,
+        string defaultPortalPassword,
+        Microsoft.AspNetCore.Identity.IPasswordHasher<Candidato> passwordHasher,
         int? randomSeed,
         CancellationToken ct)
     {
@@ -35,9 +37,29 @@ public static class CandidatoSeeder
 
         var existingEmails = await db.Candidatos
             .AsNoTracking()
+            .Where(c => c.TenantId == tenantId)
             .Select(c => c.Email)
             .Where(e => !string.IsNullOrWhiteSpace(e))
             .ToListAsync(ct);
+
+        if (!string.IsNullOrWhiteSpace(defaultPortalPassword))
+        {
+            var missingPassword = await db.Candidatos
+                .Where(c => c.TenantId == tenantId && string.IsNullOrWhiteSpace(c.PortalPasswordHash))
+                .ToListAsync(ct);
+
+            if (missingPassword.Count > 0)
+            {
+                foreach (var candidato in missingPassword)
+                {
+                    candidato.PortalPasswordHash = passwordHasher.HashPassword(candidato, defaultPortalPassword);
+                    if (string.IsNullOrWhiteSpace(candidato.PortalAccessKey))
+                        candidato.PortalAccessKey = GeneratePortalAccessKey();
+                }
+
+                await db.SaveChangesAsync(ct);
+            }
+        }
 
         var existingCount = existingEmails.Count;
         if (existingCount >= targetCount)
@@ -93,11 +115,16 @@ public static class CandidatoSeeder
                 Fonte = fonte,
                 Status = status,
                 VagaId = vaga.Id,
+                PortalAccessKey = GeneratePortalAccessKey(),
                 Obs = faker.Lorem.Sentence(8),
                 CvText = faker.Lorem.Paragraphs(2),
                 CreatedAtUtc = createdAt,
                 UpdatedAtUtc = updatedAt
             };
+            if (!string.IsNullOrWhiteSpace(defaultPortalPassword))
+            {
+                candidato.PortalPasswordHash = passwordHasher.HashPassword(candidato, defaultPortalPassword);
+            }
 
             if (faker.Random.Double() > 0.35)
             {
@@ -172,6 +199,12 @@ public static class CandidatoSeeder
         if (parts.Length == 1) return parts[0];
 
         return string.Join('.', parts);
+    }
+
+    private static string GeneratePortalAccessKey()
+    {
+        var raw = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        return raw.TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 
 }

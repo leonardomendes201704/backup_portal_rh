@@ -725,6 +725,9 @@
       setCurriculo(data.curriculo);
 
       showSwal("success", "Perfil atualizado", "Seus dados foram salvos.");
+      if (window.PortalVagasProfileCompletion?.refresh) {
+        window.PortalVagasProfileCompletion.refresh();
+      }
     } catch (err) {
       console.error(err);
       showSwal("error", "Erro inesperado", "Nao foi possivel salvar seu perfil.");

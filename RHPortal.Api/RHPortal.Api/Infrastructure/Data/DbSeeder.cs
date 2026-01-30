@@ -50,6 +50,7 @@ public static class DbSeeder
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        var candidatoPasswordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<Candidato>>();
         var localizer = scope.ServiceProvider.GetRequiredService<IStringLocalizer<SeedMessages>>();
         var resetState = scope.ServiceProvider.GetService<ResetState>();
 
@@ -132,6 +133,7 @@ public static class DbSeeder
             var vagaSeedCount = Math.Max(0, config.GetValue<int?>("Seed:Vagas:Count") ?? 50);
             var candidatoSeedCount = Math.Max(0, config.GetValue<int?>("Seed:Candidatos:Count") ?? 50);
             var candidatoSeedPerVaga = Math.Max(0, config.GetValue<int?>("Seed:Candidatos:PerVaga") ?? 0);
+            var candidatoDefaultPassword = config.GetValue<string>("Seed:Candidatos:DefaultPassword") ?? "Mudar123@";
 
             var vagaPatternsFile = config.GetValue<string>("Seed:Vagas:PatternsFile");
             var vagaRequirementsFile = config.GetValue<string>("Seed:Vagas:RequirementsFile");
@@ -186,6 +188,7 @@ public static class DbSeeder
                 vagaSeedCount: vagaSeedCount,
                 candidatoSeedCount: candidatoSeedCount,
                 candidatoSeedPerVaga: candidatoSeedPerVaga,
+                candidatoDefaultPassword: candidatoDefaultPassword,
                 vagaPatternsFile: vagaPatternsFile,
                 vagaRequirementsFile: vagaRequirementsFile,
                 inboxSeedCount: liotecnicaInboxCount,
@@ -193,6 +196,7 @@ public static class DbSeeder
                 seedCandidatosEnabled: seedCandidatosEnabled,
                 seedInboxEnabled: liotecnicaInboxEnabled,
                 localizer: localizer,
+                candidatoPasswordHasher: candidatoPasswordHasher,
                 randomSeed: randomSeed,
                 ct: ct);
 
@@ -212,6 +216,7 @@ public static class DbSeeder
                 vagaSeedCount: vagaSeedCount,
                 candidatoSeedCount: candidatoSeedCount,
                 candidatoSeedPerVaga: candidatoSeedPerVaga,
+                candidatoDefaultPassword: candidatoDefaultPassword,
                 vagaPatternsFile: vagaPatternsFile,
                 vagaRequirementsFile: vagaRequirementsFile,
                 inboxSeedCount: devInboxCount,
@@ -219,6 +224,7 @@ public static class DbSeeder
                 seedCandidatosEnabled: seedCandidatosEnabled,
                 seedInboxEnabled: devInboxEnabled,
                 localizer: localizer,
+                candidatoPasswordHasher: candidatoPasswordHasher,
                 randomSeed: randomSeed,
                 ct: ct);
 
@@ -264,6 +270,7 @@ public static class DbSeeder
         int vagaSeedCount,
         int candidatoSeedCount,
         int candidatoSeedPerVaga,
+        string candidatoDefaultPassword,
         string? vagaPatternsFile,
         string? vagaRequirementsFile,
         int inboxSeedCount,
@@ -271,6 +278,7 @@ public static class DbSeeder
         bool seedCandidatosEnabled,
         bool seedInboxEnabled,
         IStringLocalizer<SeedMessages> localizer,
+        IPasswordHasher<Candidato> candidatoPasswordHasher,
         int? randomSeed,
         CancellationToken ct)
     {
@@ -324,7 +332,7 @@ public static class DbSeeder
         if (seedCandidatosEnabled)
         {
             await global::RhPortal.Api.Infrastructure.Data.Seeders.CandidatoSeeder.EnsureAsync(
-                db, tenantId, emailDomain, candidatoSeedCount, candidatoSeedPerVaga, randomSeed, ct);
+                db, tenantId, emailDomain, candidatoSeedCount, candidatoSeedPerVaga, candidatoDefaultPassword, candidatoPasswordHasher, randomSeed, ct);
         }
 
         if (seedInboxEnabled)

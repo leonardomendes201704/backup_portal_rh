@@ -77,7 +77,9 @@ public sealed class PortalVagasController : Controller
         return new PortalVagasIndexViewModel
         {
             TenantId = tenantId ?? string.Empty,
-            ApiBaseUrl = _configuration["Endpoints:RhApi"] ?? string.Empty,
+            ApiBaseUrl = _configuration["Endpoints:RhApiPublic"]
+                         ?? _configuration["Endpoints:RhApi"]
+                         ?? string.Empty,
             IsAdmin = principal.IsInRole("Admin"),
             UserDisplayName = string.IsNullOrWhiteSpace(name) ? email : name,
             UserEmail = email,
@@ -188,6 +190,34 @@ public sealed class PortalVagasController : Controller
         var result = await _portalCandidatesApi.UpdateProfileAsync(tenantId, candidateId, request, ct);
         if (!result.Success || result.Data is null)
             return StatusCode((int)result.StatusCode, new { message = result.Message ?? "Falha ao atualizar perfil." });
+
+        return Ok(result.Data);
+    }
+
+    [Authorize(AuthenticationSchemes = CandidateAuthDefaults.Scheme)]
+    [HttpGet("/PortalVagas/Profile/Completion")]
+    public async Task<IActionResult> GetProfileCompletion(CancellationToken ct)
+    {
+        if (!TryGetCandidateContext(out var candidateId, out var tenantId, out var error))
+            return error;
+
+        var result = await _portalCandidatesApi.GetProfileCompletionAsync(tenantId, candidateId, ct);
+        if (!result.Success || result.Data is null)
+            return StatusCode((int)result.StatusCode, new { message = result.Message ?? "Falha ao calcular percentuais." });
+
+        return Ok(result.Data);
+    }
+
+    [Authorize(AuthenticationSchemes = CandidateAuthDefaults.Scheme)]
+    [HttpGet("/PortalVagas/Jobs/Matches")]
+    public async Task<IActionResult> GetJobMatches(CancellationToken ct)
+    {
+        if (!TryGetCandidateContext(out var candidateId, out var tenantId, out var error))
+            return error;
+
+        var result = await _portalCandidatesApi.GetJobMatchesAsync(tenantId, candidateId, ct);
+        if (!result.Success || result.Data is null)
+            return StatusCode((int)result.StatusCode, new { message = result.Message ?? "Falha ao calcular aderencia das vagas." });
 
         return Ok(result.Data);
     }

@@ -14,7 +14,8 @@
     acess: "tabA11y",
     agenda: "tabAgenda",
     hist: "tabApps",
-    notif: "tabNotify"
+    notif: "tabNotify",
+    match: "tabMatch"
   };
 
   const sectionsCards = document.getElementById("profileSectionsCards");
@@ -28,6 +29,11 @@
     sectionsCards?.classList.remove("d-none");
     sectionsContent?.classList.add("d-none");
     backButtons.forEach(btn => btn.classList.add("d-none"));
+    selectedKey = null;
+    const grid = document.getElementById("profileTopicsGrid");
+    if (grid) {
+      grid.querySelectorAll(".topic-card").forEach(card => card.classList.remove("is-selected"));
+    }
     if (leftCol) leftCol.classList.remove("d-none");
     if (rightCol) {
       rightCol.classList.remove("col-lg-12");
@@ -73,7 +79,7 @@
   const TOPICS = [
     { key: "perfil", name: "Perfil", icon: "bi-person" },
     { key: "testes", name: "Testes", icon: "bi-clipboard-check" },
-    { key: "comp", name: "CompetÇencias & Portfólio", icon: "bi-lightning-charge" },
+    { key: "comp", name: "Competências & Portfólio", icon: "bi-lightning-charge" },
     { key: "formacao", name: "Formação & Educação", icon: "bi-mortarboard" },
     { key: "exp", name: "Experiência & Projetos", icon: "bi-briefcase" },
     { key: "lgpd", name: "Privacidade (LGPD)", icon: "bi-shield-lock" },
@@ -84,12 +90,13 @@
     { key: "agenda", name: "Disponibilidade & Agenda", icon: "bi-calendar-week" },
     { key: "hist", name: "Histórico de Candidaturas", icon: "bi-clock-history" },
     { key: "notif", name: "Notificações & Comunicação", icon: "bi-bell" },
+    { key: "match", name: "Vagas sugeridas", icon: "bi-stars" },
     { key: "clear", name: "Limpar Perfil", icon: "bi-eraser" }
   ];
 
   const progressByKey = Object.create(null);
   TOPICS.forEach(t => {
-    progressByKey[t.key] = t.key === "clear" ? 0 : randomPercent();
+    progressByKey[t.key] = 0;
   });
 
   let selectedKey = null;
@@ -192,6 +199,290 @@
     });
   }
 
+  function applyCompletion(data) {
+    const sections = data?.sections || data?.Sections;
+    if (!sections || typeof sections !== "object") return;
+    Object.keys(progressByKey).forEach(key => {
+      const value = sections[key];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        progressByKey[key] = Math.max(0, Math.min(100, Math.round(value)));
+      }
+    });
+    renderGrid();
+    if (selectedKey) showDetail(selectedKey);
+  }
+
+  function showSuggestionsModal(data) {
+    const suggestions = data?.suggestions || data?.Suggestions;
+    if (!Array.isArray(suggestions) || !suggestions.length || !window.Swal) return;
+
+    const impactLabel = (value) => {
+      const v = (value || "").toString().toLowerCase();
+      if (v === "alta") return "Alta";
+      if (v === "media") return "Média";
+      if (v === "baixa") return "Baixa";
+      return value || "";
+    };
+
+    const esc = (s) => String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    const labelByKey = TOPICS.reduce((acc, t) => {
+      acc[t.key] = t.name;
+      return acc;
+    }, {});
+
+    const items = suggestions.map(s => {
+      const rawKey = (s.section || "").toString().toLowerCase();
+      const sectionLabel = labelByKey[rawKey] || s.section || "";
+      const section = esc(sectionLabel);
+      const text = esc(s.text || "");
+      const impact = esc(impactLabel(s.impact));
+      return `<li class="mb-2"><strong>${section}</strong> • ${text}<div class="small text-muted">Impacto: ${impact}</div></li>`;
+    }).join("");
+
+    const modalToken = Date.now().toString();
+    window.__portalSuggestionsModalToken = modalToken;
+
+    Swal.fire({
+      icon: "info",
+      title: "Sugestoes para melhorar seu perfil",
+      html: `<ul class="text-start ps-3">${items}</ul>`,
+      confirmButtonText: S.common.ok,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        const container = Swal.getContainer();
+        if (container) container.dataset.modalToken = modalToken;
+      },
+      willClose: () => {
+        const container = Swal.getContainer();
+        if (container?.dataset?.modalToken === modalToken) {
+          delete window.__portalSuggestionsModalToken;
+        }
+      }
+    });
+  }
+
+  async function openJobMatches() {
+    let loadingToken = null;
+    if (window.Swal) {
+      loadingToken = Date.now().toString();
+      Swal.fire({
+        title: "Buscando vagas sugeridas",
+        html: "Aguarde...",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          const container = Swal.getContainer();
+          if (container) container.dataset.modalToken = loadingToken;
+          Swal.showLoading();
+        },
+        willClose: () => {
+          const container = Swal.getContainer();
+          if (container?.dataset?.modalToken === loadingToken) {
+            loadingToken = null;
+          }
+        }
+      });
+    }
+
+    try {
+      const response = await fetch("/PortalVagas/Jobs/Matches", {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (loadingToken) Swal.close();
+        renderMatchesError(data?.message || "Tente novamente.");
+        return;
+      }
+
+      const matches = data?.matches || data?.Matches || [];
+      if (!Array.isArray(matches) || matches.length === 0) {
+        if (loadingToken) Swal.close();
+        renderMatchesEmpty();
+        return;
+      }
+
+      const scores = matches
+        .map(m => Number(m.score))
+        .filter(n => Number.isFinite(n));
+      if (scores.length) {
+        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        progressByKey.match = Math.max(0, Math.min(100, avg));
+        renderGrid();
+        if (selectedKey) showDetail(selectedKey);
+      }
+
+      const esc = (s) => String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      const items = matches.map((m) => {
+        const title = esc(m.title || "Vaga");
+        const area = esc(m.area || "");
+        const city = esc(m.city || "");
+        const uf = esc(m.uf || "");
+        const level = esc(m.level || "");
+        const modeRaw = (m.mode || "").toString();
+        const mode = esc(modeRaw);
+        const reason = esc(m.reason || "");
+        const score = Number.isFinite(m.score) ? m.score : 0;
+        const scoreClass = score >= 75 ? "job-score-high"
+          : score >= 50 ? "job-score-mid"
+            : score >= 25 ? "job-score-low"
+              : "job-score-zero";
+        const modeKey = modeRaw.trim().toLowerCase();
+        const modeIcon = modeKey.includes("remoto")
+          ? "bi-laptop"
+          : modeKey.includes("hibri")
+            ? "bi-arrow-repeat"
+            : "bi-building";
+
+        const metaParts = [area, level, mode, city, uf].filter(Boolean);
+        const meta = metaParts.length ? `<div class="job-match-meta">${metaParts.join(" &bull; ")}</div>` : "";
+        const reasonHtml = reason
+          ? `<div class="job-match-reason"><i class="bi bi-graph-up-arrow me-1"></i>${reason}</div>`
+          : "";
+        return `
+          <div class="job-match-card ${scoreClass}">
+            <div class="job-match-icon"><i class="bi ${modeIcon}"></i></div>
+            <div class="job-match-info">
+              <div class="job-match-title">${title}</div>
+              ${meta}
+              ${reasonHtml}
+            </div>
+            <div class="job-match-score">${score}%</div>
+          </div>`;
+      }).join("");
+
+      if (loadingToken) Swal.close();
+      const updatedAt = document.getElementById("profileJobMatchesUpdatedAt");
+      if (updatedAt) {
+        const now = new Date();
+        const pad = (v) => String(v).padStart(2, "0");
+        updatedAt.textContent = `Atualizado em ${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      }
+      renderMatchesList(items);
+    } catch (err) {
+      console.error(err);
+      if (loadingToken) Swal.close();
+      renderMatchesError("Tente novamente.");
+    }
+  }
+
+  function renderMatchesList(html) {
+    const container = document.getElementById("profileJobMatchesList");
+    const empty = document.getElementById("profileJobMatchesEmpty");
+    const error = document.getElementById("profileJobMatchesError");
+    if (container) {
+      container.innerHTML = html;
+      container.classList.remove("d-none");
+    }
+    empty?.classList.add("d-none");
+    error?.classList.add("d-none");
+  }
+
+  function renderMatchesEmpty() {
+    const container = document.getElementById("profileJobMatchesList");
+    const empty = document.getElementById("profileJobMatchesEmpty");
+    const error = document.getElementById("profileJobMatchesError");
+    container?.classList.add("d-none");
+    empty?.classList.remove("d-none");
+    error?.classList.add("d-none");
+  }
+
+  function renderMatchesError(message) {
+    const container = document.getElementById("profileJobMatchesList");
+    const empty = document.getElementById("profileJobMatchesEmpty");
+    const error = document.getElementById("profileJobMatchesError");
+    container?.classList.add("d-none");
+    empty?.classList.add("d-none");
+    if (error) {
+      error.classList.remove("d-none");
+      error.textContent = message || "Nao foi possivel carregar.";
+    }
+  }
+
+  function showCompletionCountdown(maxSeconds) {
+    if (!window.Swal) return { close: () => {} };
+    let remaining = Math.max(1, Math.floor(maxSeconds || 10));
+    let timerId = null;
+
+    Swal.fire({
+      title: "Calculando percentuais do perfil",
+      html: `Aguarde... <b>${remaining}</b>s`,
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+        const container = Swal.getHtmlContainer();
+        const counter = container ? container.querySelector("b") : null;
+        timerId = setInterval(() => {
+          remaining -= 1;
+          if (counter) counter.textContent = String(Math.max(0, remaining));
+          if (remaining <= 0 && timerId) clearInterval(timerId);
+        }, 1000);
+      },
+      willClose: () => {
+        if (timerId) clearInterval(timerId);
+      }
+    });
+
+    return {
+      close: () => {
+        if (window.__portalSuggestionsModalToken) return;
+        Swal.close();
+      }
+    };
+  }
+
+  async function fetchProfileCompletion() {
+    const handler = showCompletionCountdown(10);
+    try {
+      const response = await fetch("/PortalVagas/Profile/Completion", {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        handler.close();
+        Swal.fire({
+          icon: "warning",
+          title: "Nao foi possivel calcular",
+          text: data?.message || "Tente novamente.",
+          confirmButtonText: S.common.ok
+        });
+        return;
+      }
+      handler.close();
+      applyCompletion(data);
+      showSuggestionsModal(data);
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: "warning",
+        title: "Nao foi possivel calcular",
+        text: "Tente novamente.",
+        confirmButtonText: S.common.ok
+      });
+    } finally {
+      handler.close();
+    }
+  }
+
+  window.PortalVagasProfileCompletion = {
+    refresh: fetchProfileCompletion
+  };
+
   function wireEvents() {
     const grid = document.getElementById("profileTopicsGrid");
     if (grid && !grid.__wired) {
@@ -199,6 +490,12 @@
         const btn = ev.target.closest(".topic-card");
         if (!btn) return;
         const key = btn.getAttribute("data-key");
+        if (key === "match") {
+          showDetail(key);
+          showSectionView(key);
+          openJobMatches();
+          return;
+        }
         if (key === "clear") {
           if (typeof window.resetCandidateProfile === "function") {
             window.resetCandidateProfile();
@@ -265,6 +562,14 @@
       });
       btnOpen.__wired = true;
     }
+
+    const btnRefreshMatches = document.getElementById("profileRefreshMatchesBtn");
+    if (btnRefreshMatches && !btnRefreshMatches.__wired) {
+      btnRefreshMatches.addEventListener("click", () => {
+        openJobMatches();
+      });
+      btnRefreshMatches.__wired = true;
+    }
   }
 
   function initIfNeeded() {
@@ -281,8 +586,9 @@
     // Renderiza quando o modal abrir (evita render desnecessÃ¡rio)
     modalEl.addEventListener("shown.bs.modal", () => {
       initIfNeeded();
-      if (sectionsContent?.classList.contains("d-none")) {
-        showCardsView();
+      showCardsView();
+      if (window.PortalVagasProfileCompletion?.refresh) {
+        window.PortalVagasProfileCompletion.refresh();
       }
     });
 
@@ -295,6 +601,7 @@
     if (modalEl.classList.contains("show")) initIfNeeded();
   });
 })();
+
 
 
 

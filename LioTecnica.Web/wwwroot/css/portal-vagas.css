@@ -483,14 +483,13 @@
             min-height: 100%;
         }
 
-        .profile-sections-content {
-            background: transparent;
-            border: none;
-            border-radius: 0;
-            padding: 0;
-            overflow: auto;
-            overflow-x: hidden;
-        }
+.profile-sections-content {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    overflow: visible;
+}
 
         .profile-avatar {
             position: relative;
@@ -897,12 +896,11 @@
         }
 
         /* Footer com leve azul e linha suave */
-        #profileModal .modal-footer {
-            border-top: 1px solid rgba(15, 23, 42, .08);
-            background: #f3f7ff;
-            padding: 14px 20px;
-            margin-top: auto;
-        }
+#profileModal .modal-footer {
+    border-top: 1px solid rgba(15, 23, 42, .08);
+    background: #f3f7ff;
+    padding: 14px 20px;
+}
 
         #tagEditModal .modal-dialog {
             max-width: 360px;
@@ -1053,3 +1051,117 @@
             line-height: 1;
             font-weight: 600;
         }
+
+
+/* ===== Vagas sugeridas (cards) ===== */
+#profileModal .job-match-card {\n  border: 2px solid rgba(15, 23, 42, .18);\n  border-radius: 16px;\n  background: #ffffff;\n  padding: 12px 14px;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n#profileModal .job-match-card + .job-match-card {\n  margin-top: 12px;\n}\n#profileModal .job-match-icon {\n  width: 44px;\n  height: 44px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  border-radius: 12px;\n  background: rgba(13, 110, 253, .08);\n  color: #0d6efd;\n  font-size: 22px;\n  flex: 0 0 44px;\n}\n#profileModal .job-match-info {\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  min-width: 0;\n  flex: 1 1 auto;\n}\n#profileModal .job-match-title {\n  font-weight: 600;\n  color: #0b1220;\n}\n#profileModal .job-match-meta {\n  font-size: 0.86rem;\n  color: rgba(11, 18, 32, .6);\n}\n#profileModal .job-match-reason {\n  font-size: 0.86rem;\n  color: rgba(11, 18, 32, .65);\n  margin-top: 6px;\n  display: flex;\n  align-items: flex-start;\n}\n#profileModal .job-match-reason i {\n  margin-top: 2px;\n}\n#profileModal .job-match-score {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  min-width: 90px;\n  font-weight: 800;\n  font-size: 1.6rem;\n  color: #0d6efd;\n  flex: 0 0 auto;\n}\n#profileModal .job-score-high { border-color: rgba(22, 163, 74, .5); background: #e9f8ef; }\n#profileModal .job-score-high .job-match-score { color: #15803d; }\n#profileModal .job-score-high .job-match-icon { background: rgba(22, 163, 74, .12); color: #15803d; }\n#profileModal .job-score-mid { border-color: rgba(2, 132, 199, .5); background: #e6f4ff; }\n#profileModal .job-score-mid .job-match-score { color: #0369a1; }\n#profileModal .job-score-mid .job-match-icon { background: rgba(2, 132, 199, .12); color: #0369a1; }\n#profileModal .job-score-low { border-color: rgba(245, 158, 11, .5); background: #fff5db; }\n#profileModal .job-score-low .job-match-score { color: #b45309; }\n#profileModal .job-score-low .job-match-icon { background: rgba(245, 158, 11, .12); color: #b45309; }\n#profileModal .job-score-zero { border-color: rgba(239, 68, 68, .5); background: #ffe6e6; }\n#profileModal .job-score-zero .job-match-score { color: #b91c1c; }\n#profileModal .job-score-zero .job-match-icon { background: rgba(239, 68, 68, .12); color: #b91c1c; }\n#profileModal .job-match-card + .job-match-card {\n  margin-top: 12px;\n}\n#profileModal .job-match-icon {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  border-radius: 12px;\n  background: rgba(13, 110, 253, .08);\n  color: #0d6efd;\n  font-size: 26px;\n}\n#profileModal .job-match-info {\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  min-width: 0;\n}\n#profileModal .job-match-title {\n  font-weight: 600;\n  color: #0b1220;\n}\n#profileModal .job-match-meta {\n  font-size: 0.86rem;\n  color: rgba(11, 18, 32, .6);\n}\n#profileModal .job-match-reason {\n  font-size: 0.86rem;\n  color: rgba(11, 18, 32, .65);\n  margin-top: 6px;\n}\n#profileModal .job-match-score {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  min-width: 90px;\n  font-weight: 800;\n  font-size: 1.6rem;\n  color: #0d6efd;\n}\n#profileModal .job-score-high { border-color: rgba(22, 163, 74, .45); background: #e9f8ef; }\n#profileModal .job-score-high .job-match-score { color: #15803d; }\n#profileModal .job-score-high .job-match-icon { background: rgba(22, 163, 74, .12); color: #15803d; }\n#profileModal .job-score-mid { border-color: rgba(2, 132, 199, .45); background: #e6f4ff; }\n#profileModal .job-score-mid .job-match-score { color: #0369a1; }\n#profileModal .job-score-mid .job-match-icon { background: rgba(2, 132, 199, .12); color: #0369a1; }\n#profileModal .job-score-low { border-color: rgba(245, 158, 11, .45); background: #fff5db; }\n#profileModal .job-score-low .job-match-score { color: #b45309; }\n#profileModal .job-score-low .job-match-icon { background: rgba(245, 158, 11, .12); color: #b45309; }\n#profileModal .job-score-zero { border-color: rgba(239, 68, 68, .45); background: #ffe6e6; }\n#profileModal .job-score-zero .job-match-score { color: #b91c1c; }\n#profileModal .job-score-zero .job-match-icon { background: rgba(239, 68, 68, .12); color: #b91c1c; }
+#profileModal .job-match-card + .job-match-card {
+  margin-top: 12px;
+}
+#profileModal .job-match-title {
+  font-weight: 600;
+  color: #0b1220;
+}
+#profileModal .job-match-meta {
+  font-size: 0.86rem;
+  color: rgba(11, 18, 32, .6);
+}
+#profileModal .job-match-reason {
+  font-size: 0.86rem;
+  color: rgba(11, 18, 32, .65);
+  margin-top: 6px;
+}
+#profileModal .job-match-score {
+  flex: 0 0 auto;
+  min-width: 84px;
+  text-align: right;
+  font-weight: 800;
+  font-size: 1.6rem;
+  color: #0d6efd;
+}
+#profileModal .job-score-high { border-color: rgba(22, 163, 74, .45); background: #e9f8ef; }
+#profileModal .job-score-high .job-match-score { color: #15803d; }
+#profileModal .job-score-mid { border-color: rgba(2, 132, 199, .45); background: #e6f4ff; }
+#profileModal .job-score-mid .job-match-score { color: #0369a1; }
+#profileModal .job-score-low { border-color: rgba(245, 158, 11, .45); background: #fff5db; }
+#profileModal .job-score-low .job-match-score { color: #b45309; }
+#profileModal .job-score-zero { border-color: rgba(239, 68, 68, .45); background: #ffe6e6; }
+#profileModal .job-score-zero .job-match-score { color: #b91c1c; }
+#profileModal .job-match-card + .job-match-card {
+  margin-top: 10px;
+}
+#profileModal .job-match-title {
+  font-weight: 600;
+  color: #0b1220;
+}
+#profileModal .job-match-meta {
+  font-size: 0.86rem;
+  color: rgba(11, 18, 32, .6);
+}
+#profileModal .job-match-reason {
+  font-size: 0.86rem;
+  color: rgba(11, 18, 32, .65);
+  margin-top: 6px;
+}
+#profileModal .job-match-score {
+  flex: 0 0 auto;
+  min-width: 64px;
+  text-align: right;
+  font-weight: 700;
+  color: #0d6efd;
+}
+
+
+
+
+#profileModal .profile-sections-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+#profileModal #profileTabsContent {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+#profileModal #profileTabsContent > .tab-pane {
+  display: none;
+  flex-direction: column;
+  min-height: 100%;
+}
+#profileModal #profileTabsContent > .tab-pane.show.active {
+  display: flex;
+}
+#profileModal #profileTabsContent > .tab-pane .modal-footer {
+  margin-top: auto;
+}
+
+
+
+
+
+/* ===== Job match overrides (fix layout/border) ===== */
+#profileModal .job-match-card {
+  display: grid !important;
+  grid-template-columns: 56px 1fr 90px !important;
+  align-items: center !important;
+  border: 2px solid rgba(15, 23, 42, .22) !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  padding: 12px 14px !important;
+  box-shadow: 0 2px 8px rgba(2,6,23,.04);
+}
+#profileModal .job-match-icon {
+  width: 56px !important;
+  height: 56px !important;
+  font-size: 28px !important;
+  border-radius: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+#profileModal .job-match-score {
+  font-size: 1.7rem !important;
+  min-width: 90px !important;
+}
+
