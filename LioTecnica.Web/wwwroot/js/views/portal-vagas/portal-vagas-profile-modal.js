@@ -73,7 +73,7 @@
   const TOPICS = [
     { key: "perfil", name: "Perfil", icon: "bi-person" },
     { key: "testes", name: "Testes", icon: "bi-clipboard-check" },
-    { key: "comp", name: "Competências & Portfólio", icon: "bi-lightning-charge" },
+    { key: "comp", name: "CompetÇencias & Portfólio", icon: "bi-lightning-charge" },
     { key: "formacao", name: "Formação & Educação", icon: "bi-mortarboard" },
     { key: "exp", name: "Experiência & Projetos", icon: "bi-briefcase" },
     { key: "lgpd", name: "Privacidade (LGPD)", icon: "bi-shield-lock" },
@@ -83,11 +83,14 @@
     { key: "acess", name: "Acessibilidade & Inclusão", icon: "bi-universal-access" },
     { key: "agenda", name: "Disponibilidade & Agenda", icon: "bi-calendar-week" },
     { key: "hist", name: "Histórico de Candidaturas", icon: "bi-clock-history" },
-    { key: "notif", name: "Notificações & Comunicação", icon: "bi-bell" }
+    { key: "notif", name: "Notificações & Comunicação", icon: "bi-bell" },
+    { key: "clear", name: "Limpar Perfil", icon: "bi-eraser" }
   ];
 
   const progressByKey = Object.create(null);
-  TOPICS.forEach(t => progressByKey[t.key] = randomPercent());
+  TOPICS.forEach(t => {
+    progressByKey[t.key] = t.key === "clear" ? 0 : randomPercent();
+  });
 
   let selectedKey = null;
   let rendered = false;
@@ -179,62 +182,36 @@
       grid.appendChild(item);
     });
   }
-
-  function clearSelected() {
-    document.querySelectorAll("#profileTopicsGrid .topic-card.is-selected")
-      .forEach(x => x.classList.remove("is-selected"));
-  }
-
   function showDetail(key) {
-    const t = TOPICS.find(x => x.key === key);
-    if (!t) return;
-
     selectedKey = key;
-    const pct = progressByKey[key];
-    const hue = Math.round(hueFromPercent(pct));
-
-    const detailName = document.getElementById("profileDetailName");
-    const detailDesc = document.getElementById("profileDetailDesc");
-    const detailPercent = document.getElementById("profileDetailPercent");
-    const detailBar = document.getElementById("profileDetailBar");
-    const btnOpen = document.getElementById("profileBtnOpenSection");
-    const btnDone = document.getElementById("profileBtnMarkDone");
-
-    if (detailName) detailName.textContent = t.name;
-
-    if (detailDesc) {
-      detailDesc.innerHTML = `
-        <div class="mb-2">
-          <span class="pill"><i class="bi ${t.icon}"></i> ${t.name}</span>
-          <span class="pill"><i class="bi bi-percent"></i> ${pct}%</span>
-        </div>
-        <div class="text-secondary small">
-          Visualize o status de preenchimento desta seção e prossiga para completar as informações.
-        </div>
-      `;
-    }
-
-    if (detailPercent) detailPercent.textContent = pct + "%";
-    if (detailBar) {
-      detailBar.style.width = pct + "%";
-      detailBar.style.backgroundColor = `hsl(${hue} 70% 45%)`;
-    }
-
-    if (btnOpen) btnOpen.disabled = false;
-    if (btnDone) btnDone.disabled = false;
-
-    clearSelected();
-    const btn = document.querySelector(`#profileTopicsGrid .topic-card[data-key="${CSS.escape(key)}"]`);
-    if (btn) btn.classList.add("is-selected");
+    const grid = document.getElementById("profileTopicsGrid");
+    if (!grid) return;
+    const cards = grid.querySelectorAll(".topic-card");
+    cards.forEach(card => {
+      card.classList.toggle("is-selected", card.getAttribute("data-key") === key);
+    });
   }
 
   function wireEvents() {
     const grid = document.getElementById("profileTopicsGrid");
     if (grid && !grid.__wired) {
-      grid.addEventListener("click", (ev) => {
+      grid.addEventListener("click", ev => {
         const btn = ev.target.closest(".topic-card");
         if (!btn) return;
         const key = btn.getAttribute("data-key");
+        if (key === "clear") {
+          if (typeof window.resetCandidateProfile === "function") {
+            window.resetCandidateProfile();
+          } else {
+            Swal.fire({
+              icon: "warning",
+              title: "Acao indisponivel",
+              text: "Funcao de limpeza nao carregada.",
+              confirmButtonText: S.common.ok
+            });
+          }
+          return;
+        }
         showDetail(key);
         showSectionView(key);
       });
@@ -251,7 +228,9 @@
     const btnRandomize = document.getElementById("profileBtnRandomize");
     if (btnRandomize && !btnRandomize.__wired) {
       btnRandomize.addEventListener("click", () => {
-        TOPICS.forEach(t => progressByKey[t.key] = randomPercent());
+        TOPICS.forEach(t => {
+          progressByKey[t.key] = t.key === "clear" ? 0 : randomPercent();
+        });
         renderGrid();
         if (selectedKey) showDetail(selectedKey);
       });
@@ -274,13 +253,13 @@
       btnOpen.addEventListener("click", () => {
         if (!selectedKey) return;
 
-        // Integre aqui com sua navegação/rotas reais
+        // Integre aqui com sua navegacao/rotas reais
         // Ex.: window.location.href = `/candidato/${selectedKey}`;
         // Por enquanto: apenas feedback visual.
         Swal.fire({
           icon: "info",
-          title: "Abrir seção",
-          text: "Seção: " + selectedKey,
+          title: "Abrir secao",
+          text: "Secao: " + selectedKey,
           confirmButtonText: S.common.ok
         });
       });
@@ -299,7 +278,7 @@
     const modalEl = document.getElementById("profileModal");
     if (!modalEl) return;
 
-    // Renderiza quando o modal abrir (evita render desnecessário)
+    // Renderiza quando o modal abrir (evita render desnecessÃ¡rio)
     modalEl.addEventListener("shown.bs.modal", () => {
       initIfNeeded();
       if (sectionsContent?.classList.contains("d-none")) {
@@ -312,7 +291,10 @@
       showCardsView();
     });
 
-    // se o modal já estiver visível por algum motivo
+    // se o modal jÃ¡ estiver visÃ­vel por algum motivo
     if (modalEl.classList.contains("show")) initIfNeeded();
   });
 })();
+
+
+

@@ -4,7 +4,10 @@ const EXP_API_BASE = "/PortalVagas/Experiences";
 const PROJ_API_BASE = "/PortalVagas/Projects";
 
 const S = window.PortalVagasStrings || {};
-const SCommon = S.common || { ok: "Ok", cancel: "Cancelar", remove: "Remover" };
+window.__portalSCommon = window.__portalSCommon
+  || ((window.PortalVagasStrings && window.PortalVagasStrings.common)
+    ? window.PortalVagasStrings.common
+    : { ok: "Ok", cancel: "Cancelar", remove: "Remover" });
 
 let expProjCache = { experiences: [], projects: [] };
 let expProjLoaded = false;
@@ -257,9 +260,9 @@ function deleteExperience(id) {
     text: "Isso apaga do seu perfil (neste protótipo).",
     icon: "warning",
     showCancelButton: true,
-    confirmButtonText: SCommon.remove,
+    confirmButtonText: window.__portalSCommon.remove,
     confirmButtonColor: "#004aad",
-    cancelButtonText: SCommon.cancel
+    cancelButtonText: window.__portalSCommon.cancel
   }).then(r => {
     if (!r.isConfirmed) return;
     Promise.resolve(removeExperience(id)).then(ok => {
@@ -321,9 +324,9 @@ function deleteProject(id) {
     text: "Isso apaga do seu perfil (neste protótipo).",
     icon: "warning",
     showCancelButton: true,
-    confirmButtonText: SCommon.remove,
+    confirmButtonText: window.__portalSCommon.remove,
     confirmButtonColor: "#004aad",
-    cancelButtonText: SCommon.cancel
+    cancelButtonText: window.__portalSCommon.cancel
   }).then(r => {
     if (!r.isConfirmed) return;
     Promise.resolve(removeProject(id)).then(ok => {
@@ -517,9 +520,9 @@ function ensureTagRemoval() {
       text: `Deseja remover "${label}"?`,
       icon: "warning",
       showCancelButton: true,
-      confirmButtonText: SCommon.remove,
+      confirmButtonText: window.__portalSCommon.remove,
       confirmButtonColor: "#004aad",
-      cancelButtonText: SCommon.cancel
+      cancelButtonText: window.__portalSCommon.cancel
     }).then(async (resp) => {
       if (!resp.isConfirmed) return;
       if (!STORAGE_ENABLED && !skillsPortfLoaded) {

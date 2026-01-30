@@ -5,8 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using RhPortal.Api.Application.Candidatos;
+using RhPortal.Api.Application.ResumeParsing;
 using RhPortal.Api.Contracts.Notifications;
+using RhPortal.Api.Contracts.Candidates;
 using RhPortal.Api.Contracts.Portal;
 using RhPortal.Api.Domain.Entities;
 using RhPortal.Api.Domain.Enums;
@@ -2123,6 +2126,133 @@ public sealed class PortalCandidatesController : ControllerBase
             return NotFound(new { message = _localizer["ControllerErrors.CandidatoNotFound"] });
 
         return Ok(new PortalCandidateDocumentoSummary(created.Id, created.NomeArquivo, created.CreatedAtUtc));
+    }
+
+    /// <summary>
+    /// Limpa os dados do perfil do candidato (mantem login).
+    /// </summary>
+    [HttpPost("{id:guid}/reset-profile")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ResetProfile(
+        Guid id,
+        [FromServices] AppDbContext db,
+        [FromServices] ICandidatoService service,
+        [FromServices] ITenantContext tenantContext,
+        [FromServices] IHostEnvironment hostEnvironment,
+        CancellationToken ct)
+    {
+        var candidate = await db.Candidatos
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (candidate is null)
+            return NotFound(new { message = _localizer["ControllerErrors.CandidatoNotFound"] });
+
+        // Remove documentos (inclui curriculo e metadados)
+        var docIds = await db.CandidatoDocumentos
+            .Where(d => d.CandidatoId == id)
+            .Select(d => d.Id)
+            .ToListAsync(ct);
+
+        foreach (var docId in docIds)
+        {
+            await service.DeleteDocumentoAsync(id, docId, ct);
+        }
+
+        db.CandidatoCompetencias.RemoveRange(db.CandidatoCompetencias.Where(x => x.CandidatoId == id));
+        db.CandidatoCertificacoes.RemoveRange(db.CandidatoCertificacoes.Where(x => x.CandidatoId == id));
+        db.CandidatoPortfolios.RemoveRange(db.CandidatoPortfolios.Where(x => x.CandidatoId == id));
+        db.CandidatoEducacaoResumos.RemoveRange(db.CandidatoEducacaoResumos.Where(x => x.CandidatoId == id));
+        db.CandidatoEducacaoItens.RemoveRange(db.CandidatoEducacaoItens.Where(x => x.CandidatoId == id));
+        db.CandidatoExperiencias.RemoveRange(db.CandidatoExperiencias.Where(x => x.CandidatoId == id));
+        db.CandidatoProjetos.RemoveRange(db.CandidatoProjetos.Where(x => x.CandidatoId == id));
+        db.CandidatoPreferenciasVaga.RemoveRange(db.CandidatoPreferenciasVaga.Where(x => x.CandidatoId == id));
+        db.CandidatoReferencias.RemoveRange(db.CandidatoReferencias.Where(x => x.CandidatoId == id));
+        db.CandidatoAcessibilidades.RemoveRange(db.CandidatoAcessibilidades.Where(x => x.CandidatoId == id));
+        db.CandidatoLgpdConsents.RemoveRange(db.CandidatoLgpdConsents.Where(x => x.CandidatoId == id));
+
+        // Mantem login e dados obrigatorios (Nome/Email). Limpa o restante.
+        candidate.Fone = null;
+        candidate.Cidade = null;
+        candidate.Uf = null;
+        candidate.LinkedinUrl = null;
+        candidate.ResumoProfissional = null;
+        candidate.Obs = null;
+        candidate.CvText = null;
+        candidate.LastMatchScore = null;
+        candidate.LastMatchPass = null;
+        candidate.LastMatchAtUtc = null;
+        candidate.LastMatchVagaId = null;
+
+        if (!string.IsNullOrWhiteSpace(candidate.AvatarFileName))
+        {
+            var folder = Path.Combine(
+                hostEnvironment.ContentRootPath,
+                "App_Data",
+                "uploads",
+                tenantContext.TenantId,
+                "candidatos",
+                id.ToString("N"));
+            var filePath = Path.Combine(folder, candidate.AvatarFileName);
+            TryDeleteFile(filePath);
+        }
+
+        candidate.AvatarFileName = null;
+        candidate.AvatarContentType = null;
+
+        await db.SaveChangesAsync(ct);
+        return Ok(new { ok = true });
+    }
+
+    /// <summary>
+    /// Faz parse do curriculo enviado e retorna o JSON estruturado.
+    /// </summary>
+    [HttpPost("{id:guid}/parse-resume")]
+    [ProducesResponseType(typeof(ResumeParsedDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [RequestSizeLimit(10_485_760)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 10_485_760)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ResumeParsedDto>> ParseResume(
+        Guid id,
+        [FromForm] PortalCandidateUploadFileInput input,
+        [FromServices] AppDbContext db,
+        [FromServices] IResumeParserService resumeParserService,
+        [FromServices] IOptions<OpenAIOptions> options,
+        CancellationToken ct)
+    {
+        var arquivo = input?.Arquivo;
+        if (arquivo is null || arquivo.Length == 0)
+            return BadRequest(new { message = _localizer["ControllerErrors.CandidatoDocumentoFileInvalid"] });
+
+        if (!await CandidateExistsAsync(db, id, ct))
+            return NotFound(new { message = _localizer["ControllerErrors.CandidatoNotFound"] });
+
+        if (arquivo.Length > options.Value.MaxFileSizeBytes)
+            return StatusCode(StatusCodes.Status413PayloadTooLarge, new { message = "Arquivo excede o tamanho maximo." });
+
+        try
+        {
+            var parsed = await resumeParserService.ParseAsync(arquivo, ct);
+            return Ok(parsed);
+        }
+        catch (OpenAIServiceException ex)
+        {
+            return StatusCode(ex.StatusCode, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: "Falha ao processar o curriculo.");
+        }
     }
 
     /// <summary>

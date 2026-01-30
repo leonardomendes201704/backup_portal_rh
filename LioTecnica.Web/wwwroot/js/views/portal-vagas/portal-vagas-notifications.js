@@ -8,7 +8,10 @@ const NOTIFY_STORAGE_KEY = "liotec_portal_notify_v1";
 const NOTIFY_API_BASE = "/PortalVagas/Notifications";
 
 const S = window.PortalVagasStrings || {};
-const SCommon = S.common || { cancel: "Cancelar", clear: "Limpar" };
+window.__portalSCommon = window.__portalSCommon
+  || ((window.PortalVagasStrings && window.PortalVagasStrings.common)
+    ? window.PortalVagasStrings.common
+    : { cancel: "Cancelar", clear: "Limpar" });
 const SNotify = S.notifications || {};
 
 let __notifyHydratedOnce = false;
@@ -389,9 +392,9 @@ function resetNotify() {
     title: SNotify.clearTitle || "Limpar notificações?",
     text: "Isso apaga as preferências desta aba neste navegador.",
     showCancelButton: true,
-    confirmButtonText: SCommon.clear || "Limpar",
+    confirmButtonText: window.__portalSCommon.clear || "Limpar",
     confirmButtonColor: "#004aad",
-    cancelButtonText: SCommon.cancel || "Cancelar"
+    cancelButtonText: window.__portalSCommon.cancel || "Cancelar"
   }).then(async r => {
     if (!r.isConfirmed) return;
     if (STORAGE_ENABLED) {

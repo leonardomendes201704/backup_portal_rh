@@ -18,6 +18,7 @@
   const avatarFallback = document.getElementById("profileAvatarFallback");
   const avatarName = document.getElementById("profileAvatarName");
   const cvInput = document.getElementById("cvFileInput");
+  const cvParseBtn = document.getElementById("cvParseBtn");
   const cvName = document.getElementById("cvFileName");
   const cvDate = document.getElementById("cvFileDate");
   const userName = document.getElementById("portalUserName");
@@ -32,6 +33,7 @@
   const LOCATION_BASE = "/PortalVagas/Locations";
   let cachedUfs = null;
   const cityCache = new Map();
+  let parseRequested = false;
 
   const showSwal = (icon, title, text) => {
     window.Swal.fire({
@@ -64,6 +66,14 @@
       : `<i class="bi bi-eye me-1"></i>Visualizar curriculo`;
   };
 
+  const setParseLoading = (isLoading) => {
+    if (!cvParseBtn) return;
+    cvParseBtn.disabled = isLoading;
+    cvParseBtn.innerHTML = isLoading
+      ? `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Analisando...`
+      : `<i class="fas fa-magic me-1"></i> Preencher com curr&iacute;culo`;
+  };
+
   const digitsOnly = (value) => (value || "").replace(/\D/g, "");
 
   const formatPhone = (value) => {
@@ -79,6 +89,7 @@
   const setSelectLoading = (select, label, disabled = true) => {
     if (!select) return;
     select.disabled = disabled;
+    select.required = !disabled;
     select.innerHTML = "";
     const opt = document.createElement("option");
     opt.value = "";
@@ -105,6 +116,7 @@
     try {
       const list = await fetchUfs();
       ufSelect.disabled = false;
+      ufSelect.required = true;
       ufSelect.innerHTML = '<option value="" selected>Selecione</option>';
       list.forEach(uf => {
         const opt = document.createElement("option");
@@ -142,9 +154,10 @@
     }
     setSelectLoading(citySelect, "Carregando municipios...", true);
     try {
-      const list = await fetchCitiesForUf(uf);
-      citySelect.disabled = false;
-      citySelect.innerHTML = '<option value="" selected>Selecione</option>';
+    const list = await fetchCitiesForUf(uf);
+    citySelect.disabled = false;
+    citySelect.required = true;
+    citySelect.innerHTML = '<option value="" selected>Selecione</option>';
       list.forEach(city => {
         const opt = document.createElement("option");
         opt.value = city;
@@ -206,6 +219,12 @@
     avatarFallback.style.display = "inline";
   };
 
+  const getCurrentAvatarUrl = () => {
+    if (!avatarImg) return "";
+    const src = (avatarImg.getAttribute("src") || "").trim();
+    return src && avatarImg.style.display !== "none" ? src : "";
+  };
+
   const setCurriculo = (curriculo) => {
     if (!cvName || !cvDate) return;
     if (!curriculo) {
@@ -216,6 +235,310 @@
     cvName.textContent = curriculo.nomeArquivo || "";
     cvDate.textContent = curriculo.createdAtUtc ? `Enviado em ${formatDateTimeBr(curriculo.createdAtUtc)}` : "";
   };
+
+  const buildUid = () => `id_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+
+  const splitBullets = (text) => {
+    if (!text) return [];
+    return String(text)
+      .split(/\n|•|·|-/)
+      .map(x => x.trim())
+      .filter(Boolean);
+  };
+
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const applyParsedResume = async (parsed) => {
+    if (!parsed || typeof parsed !== "object") return;
+    const errors = [];
+
+    const candidate = parsed.candidate || {};
+    const safeSet = (el, value) => {
+      if (!el) return;
+      const current = (el.value || "").trim();
+      if (!current && value) el.value = value;
+    };
+
+    if (candidate.name) {
+      if (nameInput) nameInput.value = candidate.name;
+      if (detailNameInput) detailNameInput.value = candidate.name;
+      setAvatar(getCurrentAvatarUrl(), candidate.name);
+    }
+    safeSet(emailInput, candidate.email);
+    safeSet(detailEmailInput, candidate.email);
+    if (candidate.phone) {
+      const formatted = formatPhone(candidate.phone);
+      safeSet(phoneInput, formatted);
+      safeSet(detailPhoneInput, formatted);
+    }
+    safeSet(linkedinInput, candidate.linkedin);
+    if (candidate.summary && resumoInput) {
+      resumoInput.value = candidate.summary;
+    }
+
+    // Education
+    if (Array.isArray(parsed.education) && typeof persistEducationItem === "function") {
+      if (typeof ensureEducationLoaded === "function") await ensureEducationLoaded();
+      const existing = (typeof loadEducation === "function") ? loadEducation().items || [] : [];
+      const existingKey = new Set(existing.map(x => `${(x.course || "").toLowerCase()}|${(x.institution || "").toLowerCase()}`));
+
+      const items = parsed.education
+        .map(e => ({
+          id: buildUid(),
+          course: (e.course || "").trim(),
+          institution: (e.institution || "").trim(),
+          type: (e.level || "").trim(),
+          status: (e.end || "").trim() ? "Concluído" : "Cursando",
+          start: (e.start || "").trim(),
+          end: (e.end || "").trim(),
+          notes: "",
+          link: "",
+          updatedAt: new Date().toISOString()
+        }))
+        .filter(e => e.course || e.institution)
+        .filter(e => !existingKey.has(`${e.course.toLowerCase()}|${e.institution.toLowerCase()}`));
+
+      for (const item of items) {
+        try {
+          await persistEducationItem(item);
+        } catch {
+          errors.push("education");
+        }
+      }
+
+      if (typeof renderEducation === "function") renderEducation();
+    }
+
+    // Experience
+    if (Array.isArray(parsed.experience) && typeof persistExperience === "function") {
+      if (typeof ensureExpProjLoaded === "function") await ensureExpProjLoaded();
+      const existing = (typeof loadExpProj === "function") ? loadExpProj().experiences || [] : [];
+      const existingKey = new Set(existing.map(x => `${(x.company || "").toLowerCase()}|${(x.role || "").toLowerCase()}`));
+
+      const items = parsed.experience
+        .map(e => ({
+          id: buildUid(),
+          company: (e.company || "").trim(),
+          role: (e.role || "").trim(),
+          start: (e.start || "").trim(),
+          end: (e.end || "").trim(),
+          place: "",
+          bullets: splitBullets(e.description),
+          updatedAt: new Date().toISOString()
+        }))
+        .filter(e => e.company && e.role)
+        .filter(e => !existingKey.has(`${e.company.toLowerCase()}|${e.role.toLowerCase()}`));
+
+      for (const item of items) {
+        try {
+          await persistExperience(item);
+        } catch {
+          errors.push("experience");
+        }
+      }
+
+      if (typeof renderExperienceProjects === "function") renderExperienceProjects();
+    }
+
+    // Skills
+    if (Array.isArray(parsed.skills) && typeof persistSkill === "function") {
+      if (typeof ensureSkillsPortfolioLoaded === "function") await ensureSkillsPortfolioLoaded();
+      const existing = (typeof loadSkillsPortf === "function") ? loadSkillsPortf().skills || [] : [];
+      const existingKey = new Set(existing.map(x => (x.name || "").toLowerCase()));
+
+      let items = parsed.skills
+        .map(s => (s || "").toString().trim())
+        .filter(Boolean)
+        .filter(name => !existingKey.has(name.toLowerCase()))
+        .map(name => ({
+          id: buildUid(),
+          type: "Hard",
+          name,
+          level: "Intermediário",
+          evidence: "",
+          updatedAt: new Date().toISOString()
+        }));
+
+      if (items.length > 15) {
+        const resp = await window.Swal.fire({
+          icon: "info",
+          title: "Muitas compet\u00eancias encontradas",
+          html: `Foram encontradas <strong>${items.length}</strong> skills. Isso pode demorar alguns minutos.<br/>Deseja importar todas?`,
+          showCancelButton: true,
+          confirmButtonText: "Importar todas",
+          cancelButtonText: "Limitar a 15"
+        });
+        if (!resp.isConfirmed) {
+          items = items.slice(0, 15);
+        }
+      }
+
+      let skillErrors = 0;
+      for (const item of items) {
+        try {
+          await persistSkill(item);
+        } catch {
+          skillErrors++;
+        } finally {
+          await sleep(150);
+        }
+      }
+      if (skillErrors) errors.push("skills");
+
+      if (typeof renderSkillsPortfolio === "function") renderSkillsPortfolio();
+    }
+
+    // Certifications
+    if (Array.isArray(parsed.certifications) && typeof persistCertification === "function") {
+      if (typeof ensureSkillsPortfolioLoaded === "function") await ensureSkillsPortfolioLoaded();
+      const existing = (typeof loadSkillsPortf === "function") ? loadSkillsPortf().certs || [] : [];
+      const existingKey = new Set(existing.map(x => (x.name || "").toLowerCase()));
+
+      const items = parsed.certifications
+        .map(s => (s || "").toString().trim())
+        .filter(Boolean)
+        .filter(name => !existingKey.has(name.toLowerCase()))
+        .map(name => ({
+          id: buildUid(),
+          name,
+          org: "",
+          year: "",
+          link: "",
+          updatedAt: new Date().toISOString()
+        }));
+
+      for (const item of items) {
+        try {
+          await persistCertification(item);
+        } catch {
+          errors.push("certifications");
+        }
+      }
+
+      if (typeof renderSkillsPortfolio === "function") renderSkillsPortfolio();
+    }
+
+    if (errors.length) {
+      const unique = Array.from(new Set(errors));
+      window.Swal.fire({
+        icon: "warning",
+        title: "Importa\u00e7\u00e3o parcial",
+        text: `Alguns itens nao puderam ser importados (${unique.join(", ")}). Tente novamente mais tarde.`,
+        confirmButtonText: "Ok"
+      });
+    }
+  };
+
+  const parseResume = async (file) => {
+    if (!file) return;
+    setParseLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("arquivo", file);
+      const response = await fetch("/PortalVagas/Profile/ParseResume", {
+        method: "POST",
+        credentials: "same-origin",
+        body: formData
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const details = data?.message || data?.error || "";
+        const raw = details
+          ? `<div class="small text-muted mt-2">Detalhes:</div><pre class="text-start small" style="white-space:pre-wrap;">${details}</pre>`
+          : "";
+        window.Swal.fire({
+          icon: "error",
+          title: "Nao foi possivel analisar",
+          html: raw || "Tente novamente.",
+          confirmButtonText: "Ok"
+        });
+        return;
+      }
+
+      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      const missing = Array.isArray(data.missing_fields) ? data.missing_fields : [];
+      const skillNote = Array.isArray(data.skills) && data.skills.length
+        ? "Niveis de competencias serao definidos como Intermediario."
+        : "";
+
+      const warningText = [
+        warnings.length ? `Avisos: ${warnings.join(", ")}` : "",
+        missing.length ? `Campos ausentes: ${missing.join(", ")}` : "",
+        skillNote
+      ].filter(Boolean).join("<br/>");
+
+      const confirm = await window.Swal.fire({
+        icon: "info",
+        title: "Importar dados do curriculo?",
+        html: warningText || "Os dados encontrados serao aplicados ao seu perfil.",
+        showCancelButton: true,
+        confirmButtonText: "Aplicar agora",
+        cancelButtonText: "Cancelar"
+      });
+
+      if (!confirm.isConfirmed) return;
+        try {
+          await applyParsedResume(data);
+          showSwal("success", "Perfil atualizado", "Confira os dados e clique em Salvar.");
+        } catch (err) {
+          console.error(err);
+          const msg = (err && err.message) ? err.message : "Falha ao importar os dados do curriculo.";
+          window.Swal.fire({
+            icon: "error",
+            title: "Erro inesperado",
+            html: `<div class="small text-muted mt-2">Detalhes:</div><pre class="text-start small" style="white-space:pre-wrap;">${msg}</pre>`,
+            confirmButtonText: "Ok"
+          });
+        }
+    } catch (err) {
+      console.error(err);
+      showSwal("error", "Erro inesperado", "Nao foi possivel analisar o curriculo.");
+    } finally {
+      setParseLoading(false);
+    }
+  };
+
+  const resetProfile = async () => {
+    const confirm = await window.Swal.fire({
+      icon: "warning",
+      title: "Limpar perfil?",
+      html: "Isso vai apagar todos os dados do seu perfil, inclusive curriculo e LGPD.<br/>Notificacoes e Agenda serao mantidas.",
+      showCancelButton: true,
+      confirmButtonText: "Sim, limpar",
+      cancelButtonText: "Cancelar"
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const response = await fetch("/PortalVagas/Profile/Reset", {
+        method: "POST",
+        credentials: "same-origin"
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        window.Swal.fire({
+          icon: "error",
+          title: "Nao foi possivel limpar",
+          text: data.message || "Tente novamente."
+        });
+        return;
+      }
+
+      await window.Swal.fire({
+        icon: "success",
+        title: "Perfil limpo",
+        text: "Atualizando dados..."
+      });
+      const fresh = await loadProfile();
+      if (fresh) await applyProfileData(fresh);
+    } catch (err) {
+      console.error(err);
+      showSwal("error", "Erro inesperado", "Nao foi possivel limpar o perfil.");
+    }
+  };
+
+  window.resetCandidateProfile = resetProfile;
 
   const downloadResumePdf = async () => {
     if (!downloadPdfBtn) return;
@@ -304,30 +627,33 @@
     return data;
   };
 
+  const applyProfileData = async (data) => {
+    if (!data) return;
+    nameInput.value = data.nome || "";
+    emailInput.value = data.email || "";
+    phoneInput.value = formatPhone(data.fone || "");
+    if (detailNameInput) detailNameInput.value = data.nome || "";
+    if (detailEmailInput) detailEmailInput.value = data.email || "";
+    if (detailPhoneInput) detailPhoneInput.value = formatPhone(data.fone || "");
+    if (linkedinInput) linkedinInput.value = data.linkedinUrl || "";
+    if (resumoInput) resumoInput.value = data.resumoProfissional || "";
+    setAvatar(data.avatarUrl || "", data.nome || "");
+    setCurriculo(data.curriculo);
+    if (phoneInput) {
+      const digits = digitsOnly(phoneInput.value);
+      phoneInput.setCustomValidity(digits.length === 11 ? "" : "Telefone invalido.");
+    }
+
+    await populateUfSelect((data.uf || "").toUpperCase());
+    await populateCitySelect((data.uf || "").toUpperCase(), data.cidade || "");
+    form.classList.remove("was-validated");
+  };
+
   btnProfile.addEventListener("click", async () => {
     try {
       const data = await loadProfile();
       if (!data) return;
-
-      nameInput.value = data.nome || "";
-      emailInput.value = data.email || "";
-      phoneInput.value = formatPhone(data.fone || "");
-      if (detailNameInput) detailNameInput.value = data.nome || "";
-      if (detailEmailInput) detailEmailInput.value = data.email || "";
-      if (detailPhoneInput) detailPhoneInput.value = formatPhone(data.fone || "");
-      if (linkedinInput) linkedinInput.value = data.linkedinUrl || "";
-      if (resumoInput) resumoInput.value = data.resumoProfissional || "";
-      setAvatar(data.avatarUrl || "", data.nome || "");
-      setCurriculo(data.curriculo);
-      if (phoneInput) {
-        const digits = digitsOnly(phoneInput.value);
-        phoneInput.setCustomValidity(digits.length === 11 ? "" : "Telefone invalido.");
-      }
-
-      await populateUfSelect((data.uf || "").toUpperCase());
-      await populateCitySelect((data.uf || "").toUpperCase(), data.cidade || "");
-
-      form.classList.remove("was-validated");
+      await applyProfileData(data);
       modal.show();
     } catch (err) {
       console.error(err);
@@ -353,7 +679,10 @@
 
     if (!form.checkValidity()) {
       form.classList.add("was-validated");
-      form.reportValidity();
+      const firstInvalid = form.querySelector(":invalid");
+      if (firstInvalid && typeof firstInvalid.focus === "function") {
+        firstInvalid.focus();
+      }
       return;
     }
 
@@ -446,6 +775,13 @@
     });
   }
 
+  if (cvParseBtn) {
+    cvParseBtn.addEventListener("click", () => {
+      parseRequested = true;
+      cvInput?.click();
+    });
+  }
+
   if (cvInput) {
     cvInput.addEventListener("change", async () => {
       const file = cvInput.files?.[0];
@@ -464,6 +800,22 @@
           return;
         }
         setCurriculo(data);
+        if (parseRequested) {
+          parseRequested = false;
+          await parseResume(file);
+        } else {
+          const confirm = await window.Swal.fire({
+            icon: "question",
+            title: "Analisar curriculo?",
+            text: "Deseja preencher seu perfil com os dados encontrados?",
+            showCancelButton: true,
+            confirmButtonText: "Sim, analisar",
+            cancelButtonText: "Agora nao"
+          });
+          if (confirm.isConfirmed) {
+            await parseResume(file);
+          }
+        }
       } catch (err) {
         console.error(err);
         showSwal("error", "Erro inesperado", "Nao foi possivel enviar seu curriculo.");

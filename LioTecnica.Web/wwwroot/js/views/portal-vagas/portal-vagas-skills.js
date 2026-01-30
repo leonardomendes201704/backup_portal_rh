@@ -1,5 +1,9 @@
 // Aba: Competencias & Portfolio
 // ======================================
+window.__portalSCommon = window.__portalSCommon
+  || ((window.PortalVagasStrings && window.PortalVagasStrings.common)
+    ? window.PortalVagasStrings.common
+    : { remove: "Remover", cancel: "Cancelar" });
 const SKILLS_PORTF_STORAGE_KEY = "liotec_portal_skills_portf_v1";
 SKILLS_PORTF_API_BASE = "/PortalVagas/SkillsPortfolio";
 let skillsPortfCache = { skills: [], certs: [], links: {}, prefs: {}, tags: [] };
@@ -307,7 +311,7 @@ function renderSkillsPortfolio(){
                 data-id="${escapeAttr(s.id)}">
             <span class="skill-label">${escapeHtml(s.name)} <span style="opacity:.85;">| ${escapeHtml(s.level)}</span></span>
             <button type="button" class="skill-remove ms-2" data-id="${escapeAttr(s.id)}"
-                    aria-label="${S.common.remove}"
+                    aria-label="${window.__portalSCommon.remove}"
                     style="background:transparent;border:0;color:inherit;opacity:.9;padding:0;line-height:1;">x</button>
           </span>
         `;
@@ -492,7 +496,7 @@ function deleteSkill(id){
     title: S.skills.removeTitle,
     icon:"warning",
     showCancelButton:true,
-    confirmButtonText: S.common.remove,
+    confirmButtonText: window.__portalSCommon.remove,
     confirmButtonColor:"#004aad",
     cancelButtonText: S.common.cancel
   }).then(r=>{
@@ -523,7 +527,7 @@ document.addEventListener("contextmenu", (e) => {
     text:"Dica: clique normal para editar.",
     icon:"warning",
     showCancelButton:true,
-    confirmButtonText: S.common.remove,
+    confirmButtonText: window.__portalSCommon.remove,
     confirmButtonColor:"#004aad",
     cancelButtonText: S.common.cancel
   }).then(r=>{
@@ -591,7 +595,7 @@ function deleteCert(id){
     title: S.skills.certRemoveTitle,
     icon:"warning",
     showCancelButton:true,
-    confirmButtonText: S.common.remove,
+    confirmButtonText: window.__portalSCommon.remove,
     confirmButtonColor:"#004aad",
     cancelButtonText: S.common.cancel
   }).then(r=>{

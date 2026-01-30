@@ -6,7 +6,10 @@ const A11Y_STORAGE_KEY = "liotec_portal_a11y_v1";
 const A11Y_API_BASE = "/PortalVagas/Accessibility";
 
 const SA11y = (window.PortalVagasStrings || {}).a11y || {};
-const SCommon = (window.PortalVagasStrings || {}).common || { cancel: "Cancelar", confirm: "Confirmar" };
+window.__portalSCommon = window.__portalSCommon
+  || ((window.PortalVagasStrings && window.PortalVagasStrings.common)
+    ? window.PortalVagasStrings.common
+    : { cancel: "Cancelar", confirm: "Confirmar" });
 
 let a11yCache = null;
 let a11yLoaded = false;
@@ -272,8 +275,8 @@ function resetA11y() {
     icon: "warning",
     showCancelButton: true,
     confirmButtonColor: "#004aad",
-    confirmButtonText: SCommon.confirm || "Confirmar",
-    cancelButtonText: SCommon.cancel || "Cancelar"
+    confirmButtonText: window.__portalSCommon.confirm || "Confirmar",
+    cancelButtonText: window.__portalSCommon.cancel || "Cancelar"
   }).then(r => {
     if (!r.isConfirmed) return;
     const fresh = defaultA11y();

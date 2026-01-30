@@ -138,6 +138,57 @@ public sealed class PortalCandidatesApiClient
         return PortalApiResult<PortalCandidateDocumentoSummary>.Fail(res.StatusCode, message ?? "Falha ao enviar curriculo.");
     }
 
+    public async Task<PortalApiResult<JsonElement>> ParseResumeAsync(
+        string tenantId,
+        Guid candidateId,
+        IFormFile file,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return PortalApiResult<JsonElement>.Fail(System.Net.HttpStatusCode.BadRequest, "Tenant nao informado.");
+
+        if (file is null || file.Length == 0)
+            return PortalApiResult<JsonElement>.Fail(System.Net.HttpStatusCode.BadRequest, "Arquivo invalido.");
+
+        var url = $"api/public/portal-candidates/{candidateId}/parse-resume?tenantId={Uri.EscapeDataString(tenantId)}";
+        using var content = new MultipartFormDataContent();
+        using var stream = file.OpenReadStream();
+        content.Add(new StreamContent(stream), "arquivo", file.FileName);
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+        req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenantId);
+
+        using var res = await _http.SendAsync(req, ct);
+        if (res.IsSuccessStatusCode)
+        {
+            var data = await res.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+            return PortalApiResult<JsonElement>.Ok(data);
+        }
+
+        var message = await TryReadMessageAsync(res, ct);
+        return PortalApiResult<JsonElement>.Fail(res.StatusCode, message ?? "Falha ao analisar curriculo.");
+    }
+
+    public async Task<PortalApiResult<bool>> ResetProfileAsync(
+        string tenantId,
+        Guid candidateId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return PortalApiResult<bool>.Fail(System.Net.HttpStatusCode.BadRequest, "Tenant nao informado.");
+
+        var url = $"api/public/portal-candidates/{candidateId}/reset-profile?tenantId={Uri.EscapeDataString(tenantId)}";
+        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenantId);
+
+        using var res = await _http.SendAsync(req, ct);
+        if (res.IsSuccessStatusCode)
+            return PortalApiResult<bool>.Ok(true);
+
+        var message = await TryReadMessageAsync(res, ct);
+        return PortalApiResult<bool>.Fail(res.StatusCode, message ?? "Falha ao limpar perfil.");
+    }
+
     public async Task<PortalApiResult<PortalCandidateResumePdfResponse>> GetResumePdfAsync(
         string tenantId,
         Guid candidateId,

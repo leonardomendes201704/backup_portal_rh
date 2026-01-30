@@ -227,6 +227,37 @@ public sealed class PortalVagasController : Controller
     }
 
     [Authorize(AuthenticationSchemes = CandidateAuthDefaults.Scheme)]
+    [HttpPost("/PortalVagas/Profile/ParseResume")]
+    public async Task<IActionResult> ParseResume([FromForm(Name = "arquivo")] IFormFile arquivo, CancellationToken ct)
+    {
+        if (arquivo is null || arquivo.Length == 0)
+            return BadRequest(new { message = "Arquivo invalido." });
+
+        if (!TryGetCandidateContext(out var candidateId, out var tenantId, out var error))
+            return error;
+
+        var result = await _portalCandidatesApi.ParseResumeAsync(tenantId, candidateId, arquivo, ct);
+        if (!result.Success || result.Data.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+            return StatusCode((int)result.StatusCode, new { message = result.Message ?? "Falha ao analisar curriculo." });
+
+        return Ok(result.Data);
+    }
+
+    [Authorize(AuthenticationSchemes = CandidateAuthDefaults.Scheme)]
+    [HttpPost("/PortalVagas/Profile/Reset")]
+    public async Task<IActionResult> ResetProfile(CancellationToken ct)
+    {
+        if (!TryGetCandidateContext(out var candidateId, out var tenantId, out var error))
+            return error;
+
+        var result = await _portalCandidatesApi.ResetProfileAsync(tenantId, candidateId, ct);
+        if (!result.Success)
+            return StatusCode((int)result.StatusCode, new { message = result.Message ?? "Falha ao limpar perfil." });
+
+        return Ok(new { ok = true });
+    }
+
+    [Authorize(AuthenticationSchemes = CandidateAuthDefaults.Scheme)]
     [HttpGet("/PortalVagas/Profile/ResumePdf")]
     public async Task<IActionResult> GetResumePdf(CancellationToken ct)
     {

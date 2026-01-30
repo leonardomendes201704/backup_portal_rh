@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fluxo: Candidato se candidatando a uma vaga</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#9ca3af;
+      --primary:#1e3a8a;
+      --primary-2:#2563eb;
+      --danger-bg:#fee2e2;
+      --danger-border:#ef4444;
+      --card:#ffffff;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    .page{
+      width: 100%;
+      padding: 28px 18px 40px;
+      display:flex;
+      justify-content:center;
+    }
+    .sheet{
+      width: 980px; /* bom para exportar */
+    }
+    header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom: 14px;
+    }
+    h1{
+      font-size: 20px;
+      margin:0;
+      letter-spacing: .2px;
+    }
+    .sub{
+      margin:0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+      text-align:right;
+    }
+    .hint{
+      margin: 10px 0 16px;
+      padding: 10px 12px;
+      border: 1px dashed #d1d5db;
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .hint b{ color: var(--text); }
+    svg{
+      width: 980px;
+      height: 1400px;
+      background: linear-gradient(180deg, #ffffff 0%, #ffffff 70%, #fafafa 100%);
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+    }
+    .node{
+      fill: var(--card);
+      stroke: var(--primary);
+      stroke-width: 2;
+      rx: 14;
+      ry: 14;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.06));
+    }
+    .node-title{
+      font-size: 14px;
+      font-weight: 700;
+      fill: var(--text);
+    }
+    .node-text{
+      font-size: 13px;
+      fill: var(--text);
+    }
+    .node-muted{
+      font-size: 12px;
+      fill: var(--muted);
+    }
+    .decision{
+      fill: #eff6ff;
+      stroke: var(--primary-2);
+      stroke-width: 2;
+    }
+    .danger{
+      fill: var(--danger-bg);
+      stroke: var(--danger-border);
+      stroke-width: 2;
+      rx: 14;
+      ry: 14;
+    }
+    .final{
+      fill: #ecfdf5;
+      stroke: #10b981;
+      stroke-width: 2;
+      rx: 18;
+      ry: 18;
+    }
+    .arrow{
+      stroke: var(--line);
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrowhead);
+    }
+    .label{
+      font-size: 12px;
+      fill: var(--muted);
+      font-weight: 600;
+    }
+    .small{
+      font-size: 11px;
+      fill: var(--muted);
+    }
+    .icon{
+      font-size: 16px;
+    }
+    @media print{
+      .page{ padding:0; }
+      .hint{ display:none; }
+      svg{ border:none; border-radius:0; }
+      header{ margin-bottom: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="sheet">
+      <header>
+        <div>
+          <h1>Fluxo: Candidato se candidatando a uma vaga</h1>
+          <div class="node-muted">Baseado nos endpoints públicos da API: <code>/api/public/vagas</code> e <code>/api/public/candidaturas</code>.</div>
+        </div>
+        <p class="sub">
+          Dica: abra no Chrome/Edge<br/>
+          Imprimir → “Salvar como PDF”<br/>
+          Depois converta o PDF para JPEG
+        </p>
+      </header>
+
+      <div class="hint">
+        <b>Exportar como JPEG (opção 2):</b>
+        Abra este arquivo no navegador → <b>Ctrl+P</b> → destino <b>Salvar como PDF</b> → “Mais configurações” → papel A4 (ou A3) → escala 100% (ou “Ajustar”) → salvar.
+        Depois, converta o PDF para JPEG (qualquer conversor) ou abra o PDF e faça uma captura em alta resolução.
+      </div>
+
+      <!--
+        Layout manual (SVG) para evitar dependências e garantir visual consistente.
+        Coordenadas em px.
+      -->
+      <svg viewBox="0 0 980 1400" role="img" aria-label="Fluxograma candidato se candidatando a vaga">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#9ca3af"></polygon>
+          </marker>
+        </defs>
+
+        <!-- NÓS -->
+        <!-- 1 -->
+        <rect class="node" x="210" y="70" width="560" height="86"></rect>
+        <text class="node-title" x="490" y="102" text-anchor="middle">Candidato acessa Portal de Vagas</text>
+        <text class="node-muted" x="490" y="128" text-anchor="middle">Fluxo público (sem autenticação) para candidatura inicial</text>
+
+        <!-- 2 -->
+        <rect class="node" x="210" y="190" width="560" height="98"></rect>
+        <text class="node-title" x="490" y="222" text-anchor="middle">Lista vagas públicas</text>
+        <text class="node-text" x="490" y="248" text-anchor="middle">GET /api/public/vagas</text>
+        <text class="node-muted" x="490" y="272" text-anchor="middle">Filtros simples + paginação (somente vagas externas e abertas)</text>
+
+        <!-- 3 -->
+        <rect class="node" x="210" y="322" width="560" height="78"></rect>
+        <text class="node-title" x="490" y="354" text-anchor="middle">Escolhe uma vaga</text>
+        <text class="node-muted" x="490" y="378" text-anchor="middle">Obtém o VagaId para enviar a candidatura</text>
+
+        <!-- 4 -->
+        <rect class="node" x="210" y="434" width="560" height="104"></rect>
+        <text class="node-title" x="490" y="466" text-anchor="middle">Preenche formulário</text>
+        <text class="node-text" x="490" y="492" text-anchor="middle">Nome, Email, Fone, Cidade/UF, LinkedIn/Portfólio, etc.</text>
+        <text class="node-muted" x="490" y="516" text-anchor="middle">Opcional: arquivo de currículo</text>
+
+        <!-- 5 decisão -->
+        <polygon class="decision" points="490,580 610,650 490,720 370,650"></polygon>
+        <text class="node-title" x="490" y="646" text-anchor="middle">Anexou currículo?</text>
+
+        <!-- 6 -->
+        <rect class="node" x="210" y="760" width="560" height="112"></rect>
+        <text class="node-title" x="490" y="792" text-anchor="middle">Envia candidatura</text>
+        <text class="node-text" x="490" y="818" text-anchor="middle">POST /api/public/candidaturas</text>
+        <text class="node-muted" x="490" y="842" text-anchor="middle">multipart/form-data</text>
+        <text class="small" x="490" y="862" text-anchor="middle">📄 anexo opcional (currículo)</text>
+
+        <!-- 7 decisão -->
+        <polygon class="decision" points="490,930 630,1020 490,1110 350,1020"></polygon>
+        <text class="node-title" x="490" y="1012" text-anchor="middle">Validações básicas ok?</text>
+        <text class="small" x="490" y="1036" text-anchor="middle">VagaId != vazio, Email obrigatório</text>
+
+        <!-- erro 400 -->
+        <rect class="danger" x="40" y="980" width="250" height="84"></rect>
+        <text class="node-title" x="165" y="1012" text-anchor="middle">400 BadRequest</text>
+        <text class="node-muted" x="165" y="1038" text-anchor="middle">Dados inválidos</text>
+
+        <!-- 8 -->
+        <rect class="node" x="210" y="1140" width="560" height="92"></rect>
+        <text class="node-title" x="490" y="1172" text-anchor="middle">Busca candidato por email (tenant atual)</text>
+        <text class="node-muted" x="490" y="1198" text-anchor="middle">Se existir, atualiza; se não, cria um novo candidato</text>
+
+        <!-- 9 decisão -->
+        <polygon class="decision" points="490,1270 635,1360 490,1450 345,1360"></polygon>
+        <text class="node-title" x="490" y="1352" text-anchor="middle">Candidato já existe?</text>
+
+        <!-- 10 sim -->
+        <rect class="node" x="670" y="1322" width="270" height="92"></rect>
+        <text class="node-title" x="805" y="1354" text-anchor="middle">Atualiza e salva</text>
+        <text class="node-muted" x="805" y="1378" text-anchor="middle">Atualiza VagaId</text>
+
+        <!-- 11 nao -->
+        <rect class="node" x="40" y="1322" width="270" height="92"></rect>
+        <text class="node-title" x="175" y="1354" text-anchor="middle">Cria candidato</text>
+        <text class="node-muted" x="175" y="1378" text-anchor="middle">Status: Novo | Origem: Site</text>
+
+        <!-- 12 decisão (currículo) -->
+        <polygon class="decision" points="490,1510 610,1580 490,1650 370,1580"></polygon>
+        <text class="node-title" x="490" y="1576" text-anchor="middle">Tem currículo?</text>
+
+        <!-- 13 anexa doc -->
+        <rect class="node" x="670" y="1542" width="270" height="92"></rect>
+        <text class="node-title" x="805" y="1574" text-anchor="middle">Anexa documento</text>
+        <text class="node-muted" x="805" y="1598" text-anchor="middle">📄 Currículo</text>
+
+        <!-- 14 segue -->
+        <rect class="node" x="40" y="1542" width="270" height="92"></rect>
+        <text class="node-title" x="175" y="1574" text-anchor="middle">Segue</text>
+        <text class="node-muted" x="175" y="1598" text-anchor="middle">Sem anexo</text>
+
+        <!-- 15 email -->
+        <rect class="node" x="210" y="1690" width="560" height="94"></rect>
+        <text class="node-title" x="490" y="1722" text-anchor="middle">Tenta enviar email de confirmação (best-effort)</text>
+        <text class="node-muted" x="490" y="1748" text-anchor="middle">✉️ Template: CandidaturaConfirmacao (se PortalAccessKey existir)</text>
+
+        <!-- 16 notificacao -->
+        <rect class="node" x="210" y="1820" width="560" height="94"></rect>
+        <text class="node-title" x="490" y="1852" text-anchor="middle">Tenta notificar time interno (best-effort)</text>
+        <text class="node-muted" x="490" y="1878" text-anchor="middle">🔔 Notificação para o tenant (link para abrir candidato no portal interno)</text>
+
+        <!-- 17 final -->
+        <rect class="final" x="210" y="1950" width="560" height="84"></rect>
+        <text class="node-title" x="490" y="1984" text-anchor="middle">200 OK</text>
+        <text class="node-text" x="490" y="2008" text-anchor="middle">Retorna CandidateResponse</text>
+
+        <!-- SETAS -->
+        <path class="arrow" d="M490 156 L490 190"></path>
+        <path class="arrow" d="M490 288 L490 322"></path>
+        <path class="arrow" d="M490 400 L490 434"></path>
+        <path class="arrow" d="M490 538 L490 580"></path>
+
+        <!-- decisão currículo -> envio -->
+        <path class="arrow" d="M370 650 L260 650 L260 760"></path>
+        <text class="label" x="270" y="640">Não</text>
+        <path class="arrow" d="M610 650 L720 650 L720 760"></path>
+        <text class="label" x="705" y="640">Sim</text>
+
+        <path class="arrow" d="M490 872 L490 930"></path>
+
+        <!-- validações -> erro -->
+        <path class="arrow" d="M350 1020 L290 1020"></path>
+        <text class="label" x="305" y="1006">Inválido</text>
+
+        <!-- validações -> busca -->
+        <path class="arrow" d="M490 1110 L490 1140"></path>
+        <text class="label" x="505" y="1128">OK</text>
+
+        <path class="arrow" d="M490 1232 L490 1270"></path>
+
+        <!-- existe? -> sim e nao -->
+        <path class="arrow" d="M635 1360 L670 1360"></path>
+        <text class="label" x="646" y="1344">Sim</text>
+        <path class="arrow" d="M345 1360 L310 1360"></path>
+        <text class="label" x="320" y="1344">Não</text>
+
+        <!-- convergência para decisão currículo -->
+        <path class="arrow" d="M175 1414 L175 1480 L490 1480 L490 1510"></path>
+        <path class="arrow" d="M805 1414 L805 1480 L490 1480"></path>
+
+        <!-- tem currículo? -> anexa / segue -->
+        <path class="arrow" d="M610 1580 L670 1580"></path>
+        <text class="label" x="620" y="1564">Sim</text>
+        <path class="arrow" d="M370 1580 L310 1580"></path>
+        <text class="label" x="320" y="1564">Não</text>
+
+        <!-- segue + anexa -> email -->
+        <path class="arrow" d="M175 1634 L175 1670 L490 1670 L490 1690"></path>
+        <path class="arrow" d="M805 1634 L805 1670 L490 1670"></path>
+
+        <path class="arrow" d="M490 1784 L490 1820"></path>
+        <path class="arrow" d="M490 1914 L490 1950"></path>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
+

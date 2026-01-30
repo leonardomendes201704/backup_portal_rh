@@ -30,6 +30,7 @@ using RhPortal.Api.Application.Users;
 using RhPortal.Api.Application.Vagas;
 using RhPortal.Api.Application.Vagas.Handlers;
 using RhPortal.Api.Application.Localization;
+using RhPortal.Api.Application.ResumeParsing;
 using RhPortal.Api.Auditing.Context;
 using RhPortal.Api.Auditing.EF;
 using RhPortal.Api.Auditing.Middleware;
@@ -76,6 +77,28 @@ builder.Services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
+builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
+builder.Services.PostConfigure<OpenAIOptions>(options =>
+{
+    var envKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+    if (!string.IsNullOrWhiteSpace(envKey))
+    {
+        options.ApiKey = envKey;
+    }
+});
+builder.Services.AddHttpClient("OpenAI", (sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<OpenAIOptions>>().Value;
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        client.BaseAddress = new Uri(options.BaseUrl);
+    }
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    if (!string.IsNullOrWhiteSpace(options.ApiKey))
+    {
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.ApiKey);
+    }
+});
 builder.Services.AddCors(options =>
 {
     // Necessario para o SignalR funcionar quando o front roda em outro host/porta.
@@ -90,6 +113,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddSwaggerGen(c =>
 {
     c.OperationFilter<TenantHeaderOperationFilter>();
+    c.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
     var xmlName = $"{typeof(Program).Assembly.GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlName);
     if (File.Exists(xmlPath))
@@ -251,6 +275,7 @@ builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<UserAdministrationService>();
 builder.Services.AddScoped<RoleAdministrationService>();
 builder.Services.AddScoped<MenuAdministrationService>();
+builder.Services.AddScoped<IResumeParserService, ResumeParserService>();
 
 // Departamentos
 builder.Services.AddScoped<IListDepartmentsHandler, ListDepartmentsHandler>();
@@ -303,6 +328,7 @@ var localizationOptions = app.Services.GetRequiredService<IOptions<RequestLocali
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -315,8 +341,10 @@ if (app.Environment.IsDevelopment())
         tagsSorterProp?.SetValue(c.ConfigObject, "alpha");
     });
 }
-
-app.UseExceptionHandler();
+else
+{
+    app.UseExceptionHandler();
+}
 
 app.UseHttpsRedirection();
 
