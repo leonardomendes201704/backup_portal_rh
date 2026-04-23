@@ -1,78 +1,113 @@
 # Portal RH
 
-Portal RH is a web application for recruiting and hiring workflow management composed of:
+Portal RH is a recruiting and hiring platform composed of 3 main applications plus PostgreSQL:
 
-- `RHPortal.Api`: ASP.NET Core 9 API with Entity Framework Core, PostgreSQL, JWT authentication, multi-tenancy, SignalR, auditing, and operational logging.
-- `LioTecnica.Web`: ASP.NET Core MVC admin front-end that consumes the API, with cookie authentication and optional Microsoft Entra ID integration.
-- `LioTecnica.PortalVagas.Web`: ASP.NET Core MVC candidate portal front-end, separated from the admin experience.
+- `RHPortal.Api`: ASP.NET Core API responsible for authentication, business rules, database access, migrations, seed, health checks, auditing, and integrations.
+- `LioTecnica.Web`: ASP.NET Core MVC admin portal used by internal/admin users.
+- `LioTecnica.PortalVagas.Web`: ASP.NET Core MVC candidate portal used by applicants and public job flows.
 
-The project covers jobs, candidates, managers, departments, business units, reports, agenda, inbox, notifications, email templates, and candidate portal flows.
+## Architecture
 
-## Stack
+### 1. `RHPortal.Api`
+
+Responsibilities:
+
+- PostgreSQL access
+- Entity Framework Core migrations
+- initial seed
+- JWT authentication
+- multi-tenancy
+- health endpoints
+- public and admin endpoints
+- SignalR and operational logging
+
+Path:
+
+- `RHPortal.Api/RHPortal.Api`
+
+### 2. `LioTecnica.Web`
+
+Responsibilities:
+
+- admin login
+- internal RH workflows
+- management screens
+- links into the candidate portal
+- API consumption for admin use cases
+
+Path:
+
+- `LioTecnica.Web`
+
+### 3. `LioTecnica.PortalVagas.Web`
+
+Responsibilities:
+
+- candidate login/register
+- public jobs listing
+- application flow
+- candidate profile, documents, preferences, agenda, LGPD, notifications
+- API consumption for candidate/public flows
+
+Path:
+
+- `LioTecnica.PortalVagas.Web`
+
+## Tech stack
 
 - .NET 9
-- ASP.NET Core MVC + ASP.NET Core Web API
-- Entity Framework Core + Npgsql
-- PostgreSQL
+- ASP.NET Core MVC
+- ASP.NET Core Web API
+- Entity Framework Core
+- PostgreSQL / Npgsql
 - SignalR
 - Bootstrap 5
-- OpenAI API for resume parsing
-- Docker / Docker Compose for containerized execution
+- Docker / Docker Compose
+- OpenAI API for resume parsing features
 
 ## Repository structure
 
 ```text
 .
-|-- LioTecnica.Web/         # admin MVC web application
-|-- LioTecnica.PortalVagas.Web/ # candidate portal MVC application
-|-- RHPortal.Api/           # API solution and project
-|-- docker-compose.yml      # full stack environment with db + api + web
-|-- LOCAL_SETUP.md          # detailed local setup guide
-`-- LioTecnica.sln          # main solution
+|-- RHPortal.Api/                # API solution and project
+|-- LioTecnica.Web/              # admin portal
+|-- LioTecnica.PortalVagas.Web/  # candidate portal
+|-- docker-compose.yml           # local full stack
+|-- docker-compose.server.yml    # Ubuntu/server full stack
+|-- LOCAL_SETUP.md               # detailed local setup
+|-- DEPLOY_UBUNTU.md             # detailed Ubuntu deploy
+`-- LioTecnica.sln               # main solution
 ```
 
-## Main capabilities
+## How the 3 projects relate
 
-- admin user authentication with JWT in the API and cookies in the web app
-- optional Microsoft Entra ID authentication
-- multi-tenancy through `tenant`
-- CRUD for areas, departments, positions, managers, units, and jobs
-- separated candidate portal with profile, documents, agenda, preferences, LGPD consent, and notifications
-- PDF generation and resume HTML rendering
-- email queue and email configuration
-- API and database health checks
-- auditing and operational logs stored in the database
-- SignalR real-time updates for inbox, operational reset, and notifications
+- only `RHPortal.Api` talks directly to PostgreSQL
+- `LioTecnica.Web` depends on the API
+- `LioTecnica.PortalVagas.Web` depends on the API
+- the 2 front-ends do not use database credentials directly
 
-## Local execution
+## Local setup
 
-The detailed guide is in [LOCAL_SETUP.md](./LOCAL_SETUP.md). The short version is below.
+Detailed instructions:
 
-### Prerequisites
+- [LOCAL_SETUP.md](./LOCAL_SETUP.md)
 
-- .NET SDK with ASP.NET Core 9 runtime
-- local PostgreSQL
+Short version:
 
 ### Database
 
-The API uses `ConnectionStrings:Default`.
+Configure the API connection string in:
 
-Example used in this local environment:
+- `RHPortal.Api/RHPortal.Api/appsettings.Development.json`
+- or `ConnectionStrings__Default`
+
+Example:
 
 ```text
 Host=localhost;Port=5432;Database=bddev;Username=postgres;Password=SuaSenhaForte123!
 ```
 
-You can define it in:
-
-- `RHPortal.Api/RHPortal.Api/appsettings.Development.json`
-- or through an environment variable:
-
-```powershell
-$env:ConnectionStrings__Default="Host=localhost;Port=5432;Database=bddev;Username=postgres;Password=NovaSenhaAqui"
-```
-
-### Start the API
+### Run the API
 
 ```powershell
 cd RHPortal.Api\RHPortal.Api
@@ -84,7 +119,7 @@ Expected URL:
 
 - `https://localhost:7073/swagger`
 
-### Start the admin web app
+### Run the admin portal
 
 ```powershell
 cd LioTecnica.Web
@@ -96,7 +131,7 @@ Expected URL:
 
 - `https://localhost:7091`
 
-### Start the candidate portal
+### Run the candidate portal
 
 ```powershell
 cd LioTecnica.PortalVagas.Web
@@ -113,10 +148,14 @@ Expected URL:
 Recommended flow:
 
 1. Install PostgreSQL.
-2. Create the database that will be used by the API.
-3. Adjust `ConnectionStrings:Default`.
-4. Run the API so it applies migrations automatically.
-5. If you need the initial admin user, temporarily enable:
+2. Create the database.
+3. Configure `ConnectionStrings:Default`.
+4. Run the API to apply migrations automatically.
+5. Temporarily enable the full seed if you need the initial admin user.
+6. Run the API once to create the seeded users.
+7. Turn seed back off.
+
+Seed example:
 
 ```json
 "Seed": {
@@ -124,12 +163,9 @@ Recommended flow:
 }
 ```
 
-6. Run the API once so it creates the seeded users.
-7. Set `Seed:Enabled` back to `false` to avoid slower startup.
+## Seeded admin credentials
 
-## Seeded credentials
-
-When full seed is enabled, the default admin users are:
+Default users:
 
 - `admin@liotecnica.com.br`
 - `admin@dev.local`
@@ -140,118 +176,19 @@ Default password:
 ChangeThisPassword123!
 ```
 
-## Docker
+## Visual Studio multiple startup
 
-The repository already includes `docker-compose.yml` with:
+The solution is configured to start the 3 apps together.
 
-- PostgreSQL
-- API
-- admin web app
-- candidate portal
-- Dozzle for logs
+Recommended profile:
 
-To start the environment:
+- `API + ADMIN + PORTAL HTTPS`
 
-```powershell
-docker compose up --build
-```
+Expected profiles:
 
-Default services:
-
-- admin web: `http://localhost:8080`
-- candidate portal: `http://localhost:8081/acesso?tenantId=liotecnica`
-- api: `http://localhost:7073`
-- dozzle: `http://localhost:9999`
-
-Note:
-
-- `docker-compose.yml` uses its own database credentials for the containerized environment, independent from the local non-Docker setup
-
-## Server deployment
-
-For Ubuntu server deployment, use:
-
-- `docker-compose.server.yml`
-- `.env.server`
-- [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md)
-
-### First publish
-
-1. Copy the repository to the server, for example to `/opt/portal_rh`.
-2. Create `.env.server` from `.env.server.example`.
-3. Fill the required secrets and public URLs.
-4. Start the stack:
-
-```bash
-cd /opt/portal_rh
-docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
-```
-
-5. Confirm the containers are healthy:
-
-```bash
-docker compose --env-file .env.server -f docker-compose.server.yml ps
-```
-
-### Seed control
-
-- First start: set `SEED_ENABLED=true`
-- After the initial data is created: change it to `SEED_ENABLED=false`
-
-To apply the change:
-
-```bash
-cd /opt/portal_rh
-docker compose --env-file .env.server -f docker-compose.server.yml up -d api
-```
-
-### Updating the server after new code is pushed
-
-If the repository already exists on the server:
-
-```bash
-cd /opt/portal_rh
-git pull
-docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
-```
-
-If you changed only environment variables in `.env.server`:
-
-```bash
-cd /opt/portal_rh
-docker compose --env-file .env.server -f docker-compose.server.yml up -d
-```
-
-### Useful checks
-
-```bash
-cd /opt/portal_rh
-docker compose --env-file .env.server -f docker-compose.server.yml ps
-docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
-docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
-docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal
-```
-
-## Health check and login screen behavior
-
-The admin web app and the candidate portal call `/api/health` to verify API and database availability.
-
-On the login screen:
-
-- API and DB appear with visual status indicators
-- while the API is not ready, the front-end retries in short intervals
-- login fields stay disabled until both API and database are healthy
-
-This helps a lot when both projects are started together through Visual Studio.
-
-## Visual Studio configuration
-
-The project was adjusted to work well with multiple startup:
-
-- solution profile: `API + ADMIN + PORTAL HTTPS`
-- API using `https` profile
-- Admin using `https` profile
-- Portal using `https` profile
+- API: `https`
+- Admin: `https`
+- Portal: `https`
 
 Relevant files:
 
@@ -260,128 +197,240 @@ Relevant files:
 - `LioTecnica.Web/LioTecnica.Web.csproj.user`
 - `LioTecnica.PortalVagas.Web/LioTecnica.PortalVagas.Web.csproj.user`
 
-## Important configuration
+## Health and startup behavior
 
-### API
+Both front-ends depend on the API health.
 
-- `ConnectionStrings:Default`: PostgreSQL connection
-- `Seed:*`: initial seed control
-- `Jwt:*`: JWT signing configuration
-- `Cors:WebOrigin`: allowed front-end origin
-- `InboxFolder:*`: monitored inbox folder
-- `OpenAI:*`: resume parsing configuration
-- `EmailConfig:*`: email encryption and configuration
+### Admin portal
 
-### Web
-
-- `Endpoints:RhApi`: API base URL
-- `Endpoints:PortalVagasWeb`: candidate portal public URL used by admin links
-- `EntraId:*`: optional Microsoft login
-- `Ops:ResetKey`: key used for operational reset
+- should not crash if the API is still starting
+- menu/auth requests degrade gracefully while the API is unavailable
 
 ### Candidate portal
 
-- `Endpoints:RhApi`: internal API base URL
-- `Endpoints:RhApiPublic`: public API base URL used by browser-side calls
+- retries job loading automatically when the API is unavailable
+- waits a few seconds between retries
+- only shows a friendly unavailable state after retries fail
+
+## Docker
+
+The repository includes:
+
+- `docker-compose.yml` for local/full stack
+- `docker-compose.server.yml` for Ubuntu/server deployment
+
+Local stack includes:
+
+- PostgreSQL
+- API
+- admin portal
+- candidate portal
+- Dozzle
+
+Start locally:
+
+```powershell
+docker compose up --build
+```
+
+Default local ports:
+
+- admin: `http://localhost:8080`
+- candidate portal: `http://localhost:8081/acesso?tenantId=liotecnica`
+- api: `http://localhost:7073`
+- dozzle: `http://localhost:9999`
+
+## Ubuntu / server deployment
+
+Detailed instructions:
+
+- [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md)
+
+Core files:
+
+- `docker-compose.server.yml`
+- `.env.server`
+- `.env.server.example`
+
+Main command:
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
+```
+
+Typical public mapping:
+
+- admin: `http://HOST:8081`
+- portal: `http://HOST:8082/acesso?tenantId=liotecnica`
+- api: `http://HOST:7073/swagger`
+
+Note:
+
+- actual ports are configurable in `.env.server`
+- this matters because some servers already use `8080`
+
+## Important configuration by project
+
+### API
+
+- `ConnectionStrings:Default`
+- `Seed:*`
+- `Jwt:*`
+- `Cors:*`
+- `InboxFolder:*`
+- `OpenAI:*`
+- `EmailConfig:*`
+
+### Admin portal
+
+- `Endpoints:RhApi`
+- `Endpoints:PortalVagasWeb`
+- `EntraId:*`
+- `Ops:ResetKey`
+
+### Candidate portal
+
+- `Endpoints:RhApi`
+- `Endpoints:RhApiPublic`
+- `TransportSecurity:*`
 
 ## OpenAI
 
-OpenAI-based parsing features require an API key:
+Features that depend on OpenAI require:
 
 ```powershell
-$env:OPENAI_API_KEY="sua-chave"
+$env:OPENAI_API_KEY="your-key"
 ```
 
-Without it, the rest of the application still works, but OpenAI-dependent features will not.
+Without it:
+
+- the platform still runs
+- only OpenAI-dependent features stay unavailable
 
 ## Operational notes
 
 - the API applies migrations automatically on startup
-- essential menu and role seeds are still ensured even when the full seed is disabled
-- the project has background watchers and workers for inbox, email, logging, and notifications
-- there are dependency warnings during build, but the project compiles and runs locally
+- full seed should normally stay disabled after first bootstrap
+- the 2 front-ends depend on the API, not on PostgreSQL directly
+- build warnings may still exist in the API dependencies, but the solution builds and runs
 
 ## Internal references
 
-- detailed local guide: [LOCAL_SETUP.md](./LOCAL_SETUP.md)
-- compose environment: [docker-compose.yml](./docker-compose.yml)
-- API startup: [RHPortal.Api/RHPortal.Api/Program.cs](./RHPortal.Api/RHPortal.Api/Program.cs)
-- Web startup: [LioTecnica.Web/Program.cs](./LioTecnica.Web/Program.cs)
+- [LOCAL_SETUP.md](./LOCAL_SETUP.md)
+- [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md)
+- [docker-compose.yml](./docker-compose.yml)
+- [docker-compose.server.yml](./docker-compose.server.yml)
 
 ---
 
 # Portal RH - PT-BR
 
-Portal RH e uma aplicacao web para recrutamento e gestao de processos seletivos composta por:
+Portal RH é uma plataforma de recrutamento e seleção composta por 3 aplicações principais mais PostgreSQL:
 
-- `RHPortal.Api`: API ASP.NET Core 9 com Entity Framework Core, PostgreSQL, autenticacao JWT, multi-tenancy, SignalR, auditoria e logging operacional.
-- `LioTecnica.Web`: front-end ASP.NET Core MVC administrativo, com autenticacao por cookie e integracao opcional com Microsoft Entra ID.
-- `LioTecnica.PortalVagas.Web`: front-end ASP.NET Core MVC do portal do candidato, separado da experiencia administrativa.
+- `RHPortal.Api`: API ASP.NET Core responsável por autenticação, regras de negócio, acesso ao banco, migrations, seed, health checks, auditoria e integrações.
+- `LioTecnica.Web`: portal administrativo ASP.NET Core MVC usado pelos usuários internos/admin.
+- `LioTecnica.PortalVagas.Web`: portal de vagas/candidato ASP.NET Core MVC usado pelos candidatos e fluxos públicos.
 
-O projeto cobre fluxos de vagas, candidatos, gestores, departamentos, unidades, relatorios, agenda, inbox, notificacoes, templates de email e portal do candidato.
+## Arquitetura
 
-## Stack - PT-BR
+### 1. `RHPortal.Api`
+
+Responsabilidades:
+
+- acesso ao PostgreSQL
+- migrations do Entity Framework Core
+- seed inicial
+- autenticação JWT
+- multi-tenancy
+- endpoints de health
+- endpoints públicos e administrativos
+- SignalR e logging operacional
+
+Caminho:
+
+- `RHPortal.Api/RHPortal.Api`
+
+### 2. `LioTecnica.Web`
+
+Responsabilidades:
+
+- login administrativo
+- fluxos internos de RH
+- telas de gestão
+- links para o portal de vagas
+- consumo da API para casos administrativos
+
+Caminho:
+
+- `LioTecnica.Web`
+
+### 3. `LioTecnica.PortalVagas.Web`
+
+Responsabilidades:
+
+- login e registro do candidato
+- listagem pública de vagas
+- candidatura
+- perfil, documentos, preferências, agenda, LGPD e notificações do candidato
+- consumo da API para fluxos públicos/candidato
+
+Caminho:
+
+- `LioTecnica.PortalVagas.Web`
+
+## Stack
 
 - .NET 9
-- ASP.NET Core MVC + ASP.NET Core Web API
-- Entity Framework Core + Npgsql
-- PostgreSQL
+- ASP.NET Core MVC
+- ASP.NET Core Web API
+- Entity Framework Core
+- PostgreSQL / Npgsql
 - SignalR
 - Bootstrap 5
-- OpenAI API para parsing de curriculos
-- Docker / Docker Compose para execucao conteinerizada
+- Docker / Docker Compose
+- OpenAI API para recursos de parsing de currículo
 
-## Estrutura do repositorio
+## Estrutura do repositório
 
 ```text
 .
-|-- LioTecnica.Web/         # aplicacao web MVC administrativa
-|-- LioTecnica.PortalVagas.Web/ # aplicacao MVC do portal do candidato
-|-- RHPortal.Api/           # solucao e projeto da API
-|-- docker-compose.yml      # ambiente completo com db + api + admin + portal
-|-- LOCAL_SETUP.md          # guia detalhado de configuracao local
-`-- LioTecnica.sln          # solution principal
+|-- RHPortal.Api/                # solução e projeto da API
+|-- LioTecnica.Web/              # portal admin
+|-- LioTecnica.PortalVagas.Web/  # portal de vagas/candidato
+|-- docker-compose.yml           # stack local completa
+|-- docker-compose.server.yml    # stack Ubuntu/servidor
+|-- LOCAL_SETUP.md               # setup local detalhado
+|-- DEPLOY_UBUNTU.md             # deploy Ubuntu detalhado
+`-- LioTecnica.sln               # solution principal
 ```
 
-## Principais capacidades
+## Como os 3 projetos se relacionam
 
-- autenticacao de usuarios administrativos com JWT na API e cookies no front
-- autenticacao opcional via Microsoft Entra ID
-- multi-tenancy por `tenant`
-- CRUD de areas, departamentos, cargos, gestores, unidades e vagas
-- portal do candidato separado com perfil, documentos, agenda, preferencias, consentimento LGPD e notificacoes
-- geracao de PDFs e renderizacao HTML de curriculo
-- fila e configuracao de emails
-- health check de API e banco
-- auditoria e logs operacionais persistidos em banco
-- atualizacoes em tempo real com SignalR para inbox, reset operacional e notificacoes
+- apenas `RHPortal.Api` acessa PostgreSQL diretamente
+- `LioTecnica.Web` depende da API
+- `LioTecnica.PortalVagas.Web` depende da API
+- os 2 fronts não usam credenciais de banco diretamente
 
-## Execucao local
+## Setup local
 
-O guia detalhado esta em [LOCAL_SETUP.md](./LOCAL_SETUP.md). O resumo esta abaixo.
+Instruções detalhadas:
 
-### Pre-requisitos
+- [LOCAL_SETUP.md](./LOCAL_SETUP.md)
 
-- .NET SDK com runtime ASP.NET Core 9
-- PostgreSQL local
+Resumo:
 
-### Banco de dados
+### Banco
 
-A API usa `ConnectionStrings:Default`.
+Configure a connection string da API em:
 
-Exemplo usado neste ambiente local:
+- `RHPortal.Api/RHPortal.Api/appsettings.Development.json`
+- ou `ConnectionStrings__Default`
+
+Exemplo:
 
 ```text
 Host=localhost;Port=5432;Database=bddev;Username=postgres;Password=SuaSenhaForte123!
-```
-
-Voce pode definir isso em:
-
-- `RHPortal.Api/RHPortal.Api/appsettings.Development.json`
-- ou via variavel de ambiente:
-
-```powershell
-$env:ConnectionStrings__Default="Host=localhost;Port=5432;Database=bddev;Username=postgres;Password=NovaSenhaAqui"
 ```
 
 ### Subir a API
@@ -420,15 +469,19 @@ URL esperada:
 
 - `https://localhost:7092/acesso?tenantId=liotecnica`
 
-## Primeira execucao em uma maquina nova
+## Primeira execução em máquina nova
 
 Fluxo recomendado:
 
-1. Instalar o PostgreSQL.
-2. Criar o banco que sera usado pela API.
-3. Ajustar `ConnectionStrings:Default`.
-4. Rodar a API para aplicar as migrations automaticamente.
-5. Se precisar criar o usuario administrativo inicial, habilitar temporariamente:
+1. Instalar PostgreSQL.
+2. Criar o banco.
+3. Configurar `ConnectionStrings:Default`.
+4. Subir a API para aplicar migrations automaticamente.
+5. Ligar temporariamente o seed completo se precisar do admin inicial.
+6. Subir a API uma vez para criar os usuários seeded.
+7. Desligar o seed novamente.
+
+Exemplo:
 
 ```json
 "Seed": {
@@ -436,134 +489,32 @@ Fluxo recomendado:
 }
 ```
 
-6. Rodar a API uma vez para gerar os usuarios seeded.
-7. Voltar `Seed:Enabled` para `false` para evitar startup mais lento.
+## Credenciais do admin seeded
 
-## Credenciais do seed
-
-Quando o seed completo esta habilitado, os usuarios admin padrao sao:
+Usuários padrão:
 
 - `admin@liotecnica.com.br`
 - `admin@dev.local`
 
-Senha padrao:
+Senha padrão:
 
 ```text
 ChangeThisPassword123!
 ```
 
-## Docker - PT-BR
+## Multiple startup no Visual Studio
 
-O repositorio ja inclui `docker-compose.yml` com:
+A solution foi preparada para subir os 3 projetos juntos.
 
-- PostgreSQL
-- API
-- portal admin
-- portal de vagas
-- Dozzle para logs
+Profile recomendado:
 
-Para subir o ambiente:
+- `API + ADMIN + PORTAL HTTPS`
 
-```powershell
-docker compose up --build
-```
+Perfis esperados:
 
-Servicos padrao:
-
-- admin web: `http://localhost:8080`
-- portal vagas: `http://localhost:8081/acesso?tenantId=liotecnica`
-- api: `http://localhost:7073`
-- dozzle: `http://localhost:9999`
-
-Observacao:
-
-- o `docker-compose.yml` usa credenciais proprias para o banco do ambiente em container, independentes do setup local fora do Docker
-
-## Publicacao no servidor
-
-Para publicacao em servidor Ubuntu, use:
-
-- `docker-compose.server.yml`
-- `.env.server`
-- [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md)
-
-### Primeira publicacao
-
-1. Copie o repositorio para o servidor, por exemplo em `/opt/portal_rh`.
-2. Crie o `.env.server` a partir de `.env.server.example`.
-3. Preencha os segredos obrigatorios e as URLs publicas.
-4. Suba a stack:
-
-```bash
-cd /opt/portal_rh
-docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
-```
-
-5. Confirme que os containers ficaram saudaveis:
-
-```bash
-docker compose --env-file .env.server -f docker-compose.server.yml ps
-```
-
-### Controle do seed
-
-- Primeira subida: `SEED_ENABLED=true`
-- Depois que os dados iniciais forem criados: altere para `SEED_ENABLED=false`
-
-Para aplicar a mudanca:
-
-```bash
-cd /opt/portal_rh
-docker compose --env-file .env.server -f docker-compose.server.yml up -d api
-```
-
-### Como atualizar o servidor depois de subir novas mudancas
-
-Se o repositorio ja estiver no servidor:
-
-```bash
-cd /opt/portal_rh
-git pull
-docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
-```
-
-Se voce mudou apenas variaveis no `.env.server`:
-
-```bash
-cd /opt/portal_rh
-docker compose --env-file .env.server -f docker-compose.server.yml up -d
-```
-
-### Comandos uteis
-
-```bash
-cd /opt/portal_rh
-docker compose --env-file .env.server -f docker-compose.server.yml ps
-docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
-docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
-docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal
-```
-
-## Health check e comportamento da tela de login
-
-O portal admin e o portal de vagas chamam `/api/health` para verificar a disponibilidade da API e do banco.
-
-Na tela de login:
-
-- API e DB aparecem com indicadores visuais de status
-- enquanto a API ainda nao esta pronta, o front-end tenta novamente em intervalos curtos
-- os campos de login permanecem desabilitados ate API e banco ficarem saudaveis
-
-Isso ajuda bastante quando os dois projetos sao iniciados juntos pelo Visual Studio.
-
-## Configuracao do Visual Studio
-
-O projeto foi ajustado para funcionar bem com multiple startup:
-
-- profile da solution: `API + ADMIN + PORTAL HTTPS`
-- API usando o profile `https`
-- Admin usando o profile `https`
-- Portal de vagas usando o profile `https`
+- API: `https`
+- Admin: `https`
+- Portal: `https`
 
 Arquivos relevantes:
 
@@ -572,50 +523,127 @@ Arquivos relevantes:
 - `LioTecnica.Web/LioTecnica.Web.csproj.user`
 - `LioTecnica.PortalVagas.Web/LioTecnica.PortalVagas.Web.csproj.user`
 
-## Configuracoes importantes
+## Health e comportamento de startup
+
+Os dois fronts dependem da saúde da API.
+
+### Portal Admin
+
+- não deve quebrar se a API ainda estiver subindo
+- menu/autenticação degradam de forma controlada enquanto a API está indisponível
+
+### Portal de Vagas
+
+- tenta carregar as vagas novamente quando a API está indisponível
+- espera alguns segundos entre tentativas
+- só mostra uma indisponibilidade amigável depois das tentativas falharem
+
+## Docker
+
+O repositório inclui:
+
+- `docker-compose.yml` para stack local/completa
+- `docker-compose.server.yml` para Ubuntu/servidor
+
+A stack local inclui:
+
+- PostgreSQL
+- API
+- portal admin
+- portal de vagas
+- Dozzle
+
+Subida local:
+
+```powershell
+docker compose up --build
+```
+
+Portas padrão locais:
+
+- admin: `http://localhost:8080`
+- portal de vagas: `http://localhost:8081/acesso?tenantId=liotecnica`
+- api: `http://localhost:7073`
+- dozzle: `http://localhost:9999`
+
+## Deploy Ubuntu / servidor
+
+Instruções detalhadas:
+
+- [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md)
+
+Arquivos principais:
+
+- `docker-compose.server.yml`
+- `.env.server`
+- `.env.server.example`
+
+Comando principal:
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
+```
+
+Mapeamento público típico:
+
+- admin: `http://HOST:8081`
+- portal: `http://HOST:8082/acesso?tenantId=liotecnica`
+- api: `http://HOST:7073/swagger`
+
+Observação:
+
+- as portas reais são configuráveis via `.env.server`
+- isso é importante porque alguns servidores já usam a `8080`
+
+## Configuração importante por projeto
 
 ### API
 
-- `ConnectionStrings:Default`: conexao com PostgreSQL
-- `Seed:*`: controle do seed inicial
-- `Jwt:*`: configuracao de assinatura JWT
-- `Cors:WebOrigin`: origem permitida para o front-end
-- `InboxFolder:*`: pasta monitorada da inbox
-- `OpenAI:*`: configuracao do parser de curriculos
-- `EmailConfig:*`: criptografia e configuracao de email
+- `ConnectionStrings:Default`
+- `Seed:*`
+- `Jwt:*`
+- `Cors:*`
+- `InboxFolder:*`
+- `OpenAI:*`
+- `EmailConfig:*`
 
-### Web
+### Portal Admin
 
-- `Endpoints:RhApi`: URL base da API
-- `Endpoints:PortalVagasWeb`: URL publica do portal de vagas usada pelos links do admin
-- `EntraId:*`: login Microsoft opcional
-- `Ops:ResetKey`: chave usada no reset operacional
+- `Endpoints:RhApi`
+- `Endpoints:PortalVagasWeb`
+- `EntraId:*`
+- `Ops:ResetKey`
 
-### Portal de vagas
+### Portal de Vagas
 
-- `Endpoints:RhApi`: URL interna da API
-- `Endpoints:RhApiPublic`: URL publica da API usada nas chamadas do navegador
+- `Endpoints:RhApi`
+- `Endpoints:RhApiPublic`
+- `TransportSecurity:*`
 
-## OpenAI - PT-BR
+## OpenAI
 
-Os recursos de parsing com OpenAI exigem uma chave de API:
+Recursos que dependem de OpenAI exigem:
 
 ```powershell
 $env:OPENAI_API_KEY="sua-chave"
 ```
 
-Sem isso, o restante da aplicacao continua funcionando, mas as funcionalidades que dependem de OpenAI nao.
+Sem isso:
 
-## Observacoes operacionais
+- a plataforma continua subindo
+- apenas os recursos dependentes de OpenAI ficam indisponíveis
+
+## Observações operacionais
 
 - a API aplica migrations automaticamente no startup
-- seeds essenciais de menu e role continuam garantidos mesmo com o seed completo desligado
-- o projeto possui watchers e workers em background para inbox, email, logging e notificacoes
-- existem warnings de dependencias durante o build, mas o projeto compila e roda localmente
+- o seed completo normalmente deve ficar desligado após o bootstrap inicial
+- os 2 fronts dependem da API, não do PostgreSQL diretamente
+- ainda podem existir warnings de dependência na API, mas a solution compila e roda
 
-## Referencias internas
+## Referências internas
 
-- guia local detalhado: [LOCAL_SETUP.md](./LOCAL_SETUP.md)
-- ambiente compose: [docker-compose.yml](./docker-compose.yml)
-- startup da API: [RHPortal.Api/RHPortal.Api/Program.cs](./RHPortal.Api/RHPortal.Api/Program.cs)
-- startup do front-end: [LioTecnica.Web/Program.cs](./LioTecnica.Web/Program.cs)
+- [LOCAL_SETUP.md](./LOCAL_SETUP.md)
+- [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md)
+- [docker-compose.yml](./docker-compose.yml)
+- [docker-compose.server.yml](./docker-compose.server.yml)

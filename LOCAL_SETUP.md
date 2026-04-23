@@ -1,54 +1,116 @@
 # Setup local
 
-Este repositório não tinha um guia de ambiente local. O fluxo abaixo reflete a configuração encontrada na API, no `docker-compose.yml` e nos `launchSettings.json`.
+Este projeto possui 3 aplicações principais:
 
-## 1. Pré-requisitos
+- `RHPortal.Api`: API ASP.NET Core + Entity Framework Core + PostgreSQL
+- `LioTecnica.Web`: portal administrativo
+- `LioTecnica.PortalVagas.Web`: portal de vagas/candidato
 
-- .NET SDK com runtime ASP.NET Core 9
-- PostgreSQL local ativo na porta `5432`
+O banco é usado apenas pela API. Os dois fronts consomem a API por HTTP/HTTPS.
 
-## 2. Banco local esperado pela API
+## Arquitetura local
 
-A API está configurada para usar PostgreSQL e aplicar migrations automaticamente na inicialização.
+### 1. API
 
-Connection string local usada no projeto:
+Responsabilidade:
+
+- autenticação
+- regras de negócio
+- acesso ao PostgreSQL
+- migrations
+- seed inicial
+- health checks
+- endpoints públicos e administrativos
+
+Projeto:
+
+- `RHPortal.Api/RHPortal.Api`
+
+URL padrão local:
+
+- `https://localhost:7073/swagger`
+
+### 2. Portal Admin
+
+Responsabilidade:
+
+- operação administrativa do RH
+- cadastros, gestão e acompanhamento interno
+- login administrativo
+- navegação para o portal público
+
+Projeto:
+
+- `LioTecnica.Web`
+
+URL padrão local:
+
+- `https://localhost:7091`
+
+### 3. Portal de Vagas
+
+Responsabilidade:
+
+- experiência pública/candidato
+- login e registro do candidato
+- listagem de vagas
+- candidatura
+- perfil do candidato, documentos, agenda, preferências e afins
+
+Projeto:
+
+- `LioTecnica.PortalVagas.Web`
+
+URL padrão local:
+
+- `https://localhost:7092/acesso?tenantId=liotecnica`
+
+## Pré-requisitos
+
+- .NET SDK 9 com runtime ASP.NET Core 9
+- PostgreSQL local ativo
+- porta PostgreSQL normalmente em `5432`
+
+## Banco local
+
+A API aplica migrations automaticamente ao subir.
+
+Connection string usada no ambiente local atual:
 
 ```text
 Host=localhost;Port=5432;Database=bddev;Username=postgres;Password=SuaSenhaForte123!
 ```
 
-Se seu PostgreSQL estiver vazio, crie o usuário e o banco com algo equivalente a:
-
-```sql
-CREATE DATABASE bddev;
-```
-
-Se preferir usar outro usuário ou senha, ajuste a chave `ConnectionStrings:Default` em:
+Se você quiser usar outro usuário, senha, host ou nome de banco, ajuste:
 
 - `RHPortal.Api/RHPortal.Api/appsettings.Development.json`
 - ou a variável de ambiente `ConnectionStrings__Default`
 
-Exemplo de override por variável de ambiente no PowerShell:
+Exemplo via PowerShell:
 
 ```powershell
 $env:ConnectionStrings__Default="Host=localhost;Port=5432;Database=bddev;Username=postgres;Password=NovaSenhaAqui"
 ```
 
-Observação importante:
+Observações importantes:
 
-- o front `LioTecnica.Web` não usa credenciais de banco
-- somente a API `RHPortal.Api` precisa da connection string do PostgreSQL
-- em outra máquina, o ajuste principal quase sempre é só `ConnectionStrings:Default`
+- `LioTecnica.Web` não acessa PostgreSQL diretamente
+- `LioTecnica.PortalVagas.Web` não acessa PostgreSQL diretamente
+- apenas a API precisa da connection string do banco
 
-## 2.1 Primeira execução em outra máquina
+## Primeira execução em máquina nova
 
-Se outro agente ou desenvolvedor precisar configurar o projeto pela primeira vez em uma máquina nova, o fluxo recomendado é:
+Fluxo recomendado:
 
-1. Instalar PostgreSQL localmente.
-2. Criar o banco que a API vai usar.
-3. Definir a connection string da API no `appsettings.Development.json` ou via variável de ambiente `ConnectionStrings__Default`.
-4. Rodar a API uma vez para aplicar migrations.
-5. Se precisar de usuário administrativo inicial, ligar temporariamente:
+1. Instalar PostgreSQL.
+2. Criar o banco que será usado pela API.
+3. Configurar `ConnectionStrings:Default`.
+4. Subir a API uma vez para aplicar migrations.
+5. Se precisar de usuário admin inicial, ligar temporariamente o seed.
+6. Subir a API novamente para criar os usuários seeded.
+7. Voltar o seed para `false`.
+
+Exemplo de seed temporário:
 
 ```json
 "Seed": {
@@ -56,10 +118,9 @@ Se outro agente ou desenvolvedor precisar configurar o projeto pela primeira vez
 }
 ```
 
-6. Subir a API uma vez para criar os usuários seeded.
-7. Voltar `Seed:Enabled` para `false` para evitar startup mais lento nas próximas execuções.
+## Credenciais do seed inicial
 
-Credenciais padrão do admin seeded:
+Quando o seed completo está habilitado, os admins padrão são:
 
 - `admin@liotecnica.com.br`
 - `admin@dev.local`
@@ -70,80 +131,122 @@ Senha padrão:
 ChangeThisPassword123!
 ```
 
-No ambiente configurado nesta máquina, os admins já foram criados uma vez e depois o seed voltou para `false`.
-
-## 3. Rodar a API
-
-Na pasta `RHPortal.Api/RHPortal.Api`:
-
-```powershell
-dotnet restore
-dotnet run
-```
-
-Ao subir, a aplicação executa `Database.MigrateAsync()` e aplica todas as migrations automaticamente.
-
-Swagger da API:
-
-```text
-https://localhost:7073/swagger
-```
-
-## 4. Seeds
-
-Por padrão:
-
-- as migrations sobem sempre
-- os seeds completos estão desligados (`Seed:Enabled = false`)
-- os menus e roles básicos continuam sendo garantidos
-
-Se quiser popular dados de exemplo, altere na API:
+Depois da primeira criação, o recomendado é manter:
 
 ```json
 "Seed": {
-  "Enabled": true
+  "Enabled": false
 }
 ```
 
-Senha padrão do admin seeded:
+## Como subir cada projeto
 
-```text
-ChangeThisPassword123!
-```
-
-## 5. Rodar o front web local
-
-Na pasta `LioTecnica.Web`:
+### API
 
 ```powershell
+cd RHPortal.Api\RHPortal.Api
 dotnet restore
 dotnet run
 ```
 
-URL local do front:
+Resultado esperado:
 
-```text
-https://localhost:7091
+- migrations aplicadas automaticamente
+- Swagger disponível em `https://localhost:7073/swagger`
+
+### Portal Admin
+
+```powershell
+cd LioTecnica.Web
+dotnet restore
+dotnet run
 ```
 
-O front já está apontando para a API local em `https://localhost:7073/`.
+Resultado esperado:
 
-## 6. OpenAI
+- front administrativo em `https://localhost:7091`
+- consumindo a API local
 
-O recurso de parsing com OpenAI só funciona se você definir:
+### Portal de Vagas
+
+```powershell
+cd LioTecnica.PortalVagas.Web
+dotnet restore
+dotnet run
+```
+
+Resultado esperado:
+
+- portal público em `https://localhost:7092/acesso?tenantId=liotecnica`
+- consumindo a API local
+
+## Multiple startup no Visual Studio
+
+O setup foi preparado para subir os 3 projetos juntos.
+
+Profile da solution:
+
+- `API + ADMIN + PORTAL HTTPS`
+
+Perfis esperados:
+
+- API: `https`
+- Admin: `https`
+- Portal: `https`
+
+Arquivos relacionados:
+
+- `LioTecnica.slnLaunch.user`
+- `RHPortal.Api/RHPortal.Api/RHPortal.Api.csproj.user`
+- `LioTecnica.Web/LioTecnica.Web.csproj.user`
+- `LioTecnica.PortalVagas.Web/LioTecnica.PortalVagas.Web.csproj.user`
+
+## Comportamento de health check
+
+Os dois fronts consultam `/health` na API.
+
+### Portal Admin
+
+- não deve quebrar se a API ainda estiver subindo
+- menu e autenticação degradam de forma controlada
+
+### Portal de Vagas
+
+- tenta carregar as vagas novamente quando a API está indisponível
+- faz novas tentativas automáticas
+- só mostra indisponibilidade amigável depois das tentativas falharem
+
+## OpenAI
+
+Recursos que dependem de OpenAI exigem:
 
 ```powershell
 $env:OPENAI_API_KEY="sua-chave"
 ```
 
-Sem isso, o restante da aplicação pode subir, mas funcionalidades que dependem da OpenAI não vão funcionar.
+Sem isso:
 
-## 7. Inbox local
+- a aplicação geral continua funcionando
+- recursos dependentes de parsing/IA não funcionarão
 
-A pasta monitorada da inbox foi configurada para:
+## Inbox local
+
+A inbox local foi configurada para dentro do repositório:
 
 ```text
 RHPortal.Api/RHPortal.Api/App_Data/Inbox
 ```
 
-Isso evita dependência de um caminho absoluto fora do repositório.
+Isso evita dependência de caminhos absolutos externos.
+
+## Resumo rápido
+
+Em uma máquina nova, normalmente você só precisa:
+
+1. configurar PostgreSQL
+2. ajustar `ConnectionStrings:Default`
+3. subir `RHPortal.Api`
+4. subir `LioTecnica.Web`
+5. subir `LioTecnica.PortalVagas.Web`
+
+O banco é responsabilidade da API; os 2 fronts dependem da API, não do PostgreSQL diretamente.
