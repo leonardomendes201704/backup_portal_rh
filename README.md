@@ -218,3 +218,226 @@ Without it, the rest of the application still works, but OpenAI-dependent featur
 - compose environment: [docker-compose.yml](./docker-compose.yml)
 - API startup: [RHPortal.Api/RHPortal.Api/Program.cs](./RHPortal.Api/RHPortal.Api/Program.cs)
 - Web startup: [LioTecnica.Web/Program.cs](./LioTecnica.Web/Program.cs)
+
+---
+
+# Portal RH - PT-BR
+
+Portal RH e uma aplicacao web para recrutamento e gestao de processos seletivos composta por:
+
+- `RHPortal.Api`: API ASP.NET Core 9 com Entity Framework Core, PostgreSQL, autenticacao JWT, multi-tenancy, SignalR, auditoria e logging operacional.
+- `LioTecnica.Web`: front-end ASP.NET Core MVC que consome a API, com autenticacao por cookie e integracao opcional com Microsoft Entra ID.
+
+O projeto cobre fluxos de vagas, candidatos, gestores, departamentos, unidades, relatorios, agenda, inbox, notificacoes, templates de email e portal do candidato.
+
+## Stack - PT-BR
+
+- .NET 9
+- ASP.NET Core MVC + ASP.NET Core Web API
+- Entity Framework Core + Npgsql
+- PostgreSQL
+- SignalR
+- Bootstrap 5
+- OpenAI API para parsing de curriculos
+- Docker / Docker Compose para execucao conteinerizada
+
+## Estrutura do repositorio
+
+```text
+.
+|-- LioTecnica.Web/         # aplicacao web MVC
+|-- RHPortal.Api/           # solucao e projeto da API
+|-- docker-compose.yml      # ambiente completo com db + api + web
+|-- LOCAL_SETUP.md          # guia detalhado de configuracao local
+`-- LioTecnica.sln          # solution principal
+```
+
+## Principais capacidades
+
+- autenticacao de usuarios administrativos com JWT na API e cookies no front
+- autenticacao opcional via Microsoft Entra ID
+- multi-tenancy por `tenant`
+- CRUD de areas, departamentos, cargos, gestores, unidades e vagas
+- portal do candidato com perfil, documentos, agenda, preferencias, consentimento LGPD e notificacoes
+- geracao de PDFs e renderizacao HTML de curriculo
+- fila e configuracao de emails
+- health check de API e banco
+- auditoria e logs operacionais persistidos em banco
+- atualizacoes em tempo real com SignalR para inbox, reset operacional e notificacoes
+
+## Execucao local
+
+O guia detalhado esta em [LOCAL_SETUP.md](./LOCAL_SETUP.md). O resumo esta abaixo.
+
+### Pre-requisitos
+
+- .NET SDK com runtime ASP.NET Core 9
+- PostgreSQL local
+
+### Banco de dados
+
+A API usa `ConnectionStrings:Default`.
+
+Exemplo usado neste ambiente local:
+
+```text
+Host=localhost;Port=5432;Database=bddev;Username=postgres;Password=SuaSenhaForte123!
+```
+
+Voce pode definir isso em:
+
+- `RHPortal.Api/RHPortal.Api/appsettings.Development.json`
+- ou via variavel de ambiente:
+
+```powershell
+$env:ConnectionStrings__Default="Host=localhost;Port=5432;Database=bddev;Username=postgres;Password=NovaSenhaAqui"
+```
+
+### Subir a API
+
+```powershell
+cd RHPortal.Api\RHPortal.Api
+dotnet restore
+dotnet run
+```
+
+URL esperada:
+
+- `https://localhost:7073/swagger`
+
+### Subir o front-end
+
+```powershell
+cd LioTecnica.Web
+dotnet restore
+dotnet run
+```
+
+URL esperada:
+
+- `https://localhost:7091`
+
+## Primeira execucao em uma maquina nova
+
+Fluxo recomendado:
+
+1. Instalar o PostgreSQL.
+2. Criar o banco que sera usado pela API.
+3. Ajustar `ConnectionStrings:Default`.
+4. Rodar a API para aplicar as migrations automaticamente.
+5. Se precisar criar o usuario administrativo inicial, habilitar temporariamente:
+
+```json
+"Seed": {
+  "Enabled": true
+}
+```
+
+6. Rodar a API uma vez para gerar os usuarios seeded.
+7. Voltar `Seed:Enabled` para `false` para evitar startup mais lento.
+
+## Credenciais do seed
+
+Quando o seed completo esta habilitado, os usuarios admin padrao sao:
+
+- `admin@liotecnica.com.br`
+- `admin@dev.local`
+
+Senha padrao:
+
+```text
+ChangeThisPassword123!
+```
+
+## Docker - PT-BR
+
+O repositorio ja inclui `docker-compose.yml` com:
+
+- PostgreSQL
+- API
+- front-end web
+- Dozzle para logs
+
+Para subir o ambiente:
+
+```powershell
+docker compose up --build
+```
+
+Servicos padrao:
+
+- web: `http://localhost:8080`
+- api: `http://localhost:7073`
+- dozzle: `http://localhost:9999`
+
+Observacao:
+
+- o `docker-compose.yml` usa credenciais proprias para o banco do ambiente em container, independentes do setup local fora do Docker
+
+## Health check e comportamento da tela de login
+
+O front chama `/api/health` para verificar a disponibilidade da API e do banco.
+
+Na tela de login:
+
+- API e DB aparecem com indicadores visuais de status
+- enquanto a API ainda nao esta pronta, o front-end tenta novamente em intervalos curtos
+- os campos de login permanecem desabilitados ate API e banco ficarem saudaveis
+
+Isso ajuda bastante quando os dois projetos sao iniciados juntos pelo Visual Studio.
+
+## Configuracao do Visual Studio
+
+O projeto foi ajustado para funcionar bem com multiple startup:
+
+- profile da solution: `API + WEB HTTPS`
+- API usando o profile `https`
+- Web usando o profile `https`
+
+Arquivos relevantes:
+
+- `LioTecnica.slnLaunch.user`
+- `RHPortal.Api/RHPortal.Api/RHPortal.Api.csproj.user`
+- `LioTecnica.Web/LioTecnica.Web.csproj.user`
+
+## Configuracoes importantes
+
+### API
+
+- `ConnectionStrings:Default`: conexao com PostgreSQL
+- `Seed:*`: controle do seed inicial
+- `Jwt:*`: configuracao de assinatura JWT
+- `Cors:WebOrigin`: origem permitida para o front-end
+- `InboxFolder:*`: pasta monitorada da inbox
+- `OpenAI:*`: configuracao do parser de curriculos
+- `EmailConfig:*`: criptografia e configuracao de email
+
+### Web
+
+- `Endpoints:RhApi`: URL base da API
+- `EntraId:*`: login Microsoft opcional
+- `Ops:ResetKey`: chave usada no reset operacional
+
+## OpenAI - PT-BR
+
+Os recursos de parsing com OpenAI exigem uma chave de API:
+
+```powershell
+$env:OPENAI_API_KEY="sua-chave"
+```
+
+Sem isso, o restante da aplicacao continua funcionando, mas as funcionalidades que dependem de OpenAI nao.
+
+## Observacoes operacionais
+
+- a API aplica migrations automaticamente no startup
+- seeds essenciais de menu e role continuam garantidos mesmo com o seed completo desligado
+- o projeto possui watchers e workers em background para inbox, email, logging e notificacoes
+- existem warnings de dependencias durante o build, mas o projeto compila e roda localmente
+
+## Referencias internas
+
+- guia local detalhado: [LOCAL_SETUP.md](./LOCAL_SETUP.md)
+- ambiente compose: [docker-compose.yml](./docker-compose.yml)
+- startup da API: [RHPortal.Api/RHPortal.Api/Program.cs](./RHPortal.Api/RHPortal.Api/Program.cs)
+- startup do front-end: [LioTecnica.Web/Program.cs](./LioTecnica.Web/Program.cs)
