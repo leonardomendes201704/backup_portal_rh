@@ -35,6 +35,8 @@ services:
       Jwt__SigningKey: ${JWT_SIGNING_KEY}
       Ops__ResetKey: ${OPS_RESET_KEY}
       Cors__WebOrigin: ${WEB_PUBLIC_ORIGIN}
+      Cors__AllowedOrigins__0: ${WEB_PUBLIC_ORIGIN}
+      Cors__AllowedOrigins__1: ${PORTAL_PUBLIC_ORIGIN}
       InboxFolder__RootPath: /app/App_Data/Inbox
       TransportSecurity__UseHttpsRedirection: ${API_USE_HTTPS_REDIRECTION:-false}
       Seed__Enabled: ${SEED_ENABLED:-true}
@@ -77,6 +79,7 @@ services:
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       Endpoints__RhApi: http://api:8080/
       Endpoints__RhApiPublic: ${API_PUBLIC_URL}
+      Endpoints__PortalVagasWeb: ${PORTAL_PUBLIC_URL}
       Ops__ResetKey: ${OPS_RESET_KEY}
       TransportSecurity__UseHttpsRedirection: ${WEB_USE_HTTPS_REDIRECTION:-false}
       TransportSecurity__UseHsts: ${WEB_USE_HSTS:-false}
@@ -90,6 +93,33 @@ services:
       - "${WEB_PUBLIC_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/Account/Login > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  portal:
+    build:
+      context: .
+      dockerfile: LioTecnica.PortalVagas.Web/Dockerfile
+    container_name: liotecnica-portal-vagas
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      Endpoints__RhApi: http://api:8080/
+      Endpoints__RhApiPublic: ${API_PUBLIC_URL}
+      TransportSecurity__UseHttpsRedirection: ${PORTAL_USE_HTTPS_REDIRECTION:-false}
+      TransportSecurity__UseHsts: ${PORTAL_USE_HSTS:-false}
+      TransportSecurity__SecureCookies: ${PORTAL_SECURE_COOKIES:-false}
+    ports:
+      - "${PORTAL_PUBLIC_PORT:-8081}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/acesso?tenantId=liotecnica > /dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10

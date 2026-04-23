@@ -3,7 +3,8 @@
 Portal RH is a web application for recruiting and hiring workflow management composed of:
 
 - `RHPortal.Api`: ASP.NET Core 9 API with Entity Framework Core, PostgreSQL, JWT authentication, multi-tenancy, SignalR, auditing, and operational logging.
-- `LioTecnica.Web`: ASP.NET Core MVC front-end that consumes the API, with cookie authentication and optional Microsoft Entra ID integration.
+- `LioTecnica.Web`: ASP.NET Core MVC admin front-end that consumes the API, with cookie authentication and optional Microsoft Entra ID integration.
+- `LioTecnica.PortalVagas.Web`: ASP.NET Core MVC candidate portal front-end, separated from the admin experience.
 
 The project covers jobs, candidates, managers, departments, business units, reports, agenda, inbox, notifications, email templates, and candidate portal flows.
 
@@ -22,7 +23,8 @@ The project covers jobs, candidates, managers, departments, business units, repo
 
 ```text
 .
-|-- LioTecnica.Web/         # MVC web application
+|-- LioTecnica.Web/         # admin MVC web application
+|-- LioTecnica.PortalVagas.Web/ # candidate portal MVC application
 |-- RHPortal.Api/           # API solution and project
 |-- docker-compose.yml      # full stack environment with db + api + web
 |-- LOCAL_SETUP.md          # detailed local setup guide
@@ -35,7 +37,7 @@ The project covers jobs, candidates, managers, departments, business units, repo
 - optional Microsoft Entra ID authentication
 - multi-tenancy through `tenant`
 - CRUD for areas, departments, positions, managers, units, and jobs
-- candidate portal with profile, documents, agenda, preferences, LGPD consent, and notifications
+- separated candidate portal with profile, documents, agenda, preferences, LGPD consent, and notifications
 - PDF generation and resume HTML rendering
 - email queue and email configuration
 - API and database health checks
@@ -82,7 +84,7 @@ Expected URL:
 
 - `https://localhost:7073/swagger`
 
-### Start the web app
+### Start the admin web app
 
 ```powershell
 cd LioTecnica.Web
@@ -93,6 +95,18 @@ dotnet run
 Expected URL:
 
 - `https://localhost:7091`
+
+### Start the candidate portal
+
+```powershell
+cd LioTecnica.PortalVagas.Web
+dotnet restore
+dotnet run
+```
+
+Expected URL:
+
+- `https://localhost:7092/acesso?tenantId=liotecnica`
 
 ## First run on a new machine
 
@@ -132,7 +146,8 @@ The repository already includes `docker-compose.yml` with:
 
 - PostgreSQL
 - API
-- web app
+- admin web app
+- candidate portal
 - Dozzle for logs
 
 To start the environment:
@@ -143,7 +158,8 @@ docker compose up --build
 
 Default services:
 
-- web: `http://localhost:8080`
+- admin web: `http://localhost:8080`
+- candidate portal: `http://localhost:8081/acesso?tenantId=liotecnica`
 - api: `http://localhost:7073`
 - dozzle: `http://localhost:9999`
 
@@ -213,11 +229,12 @@ cd /opt/portal_rh
 docker compose --env-file .env.server -f docker-compose.server.yml ps
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal
 ```
 
 ## Health check and login screen behavior
 
-The web app calls `/api/health` to verify API and database availability.
+The admin web app and the candidate portal call `/api/health` to verify API and database availability.
 
 On the login screen:
 
@@ -231,15 +248,17 @@ This helps a lot when both projects are started together through Visual Studio.
 
 The project was adjusted to work well with multiple startup:
 
-- solution profile: `API + WEB HTTPS`
+- solution profile: `API + ADMIN + PORTAL HTTPS`
 - API using `https` profile
-- Web using `https` profile
+- Admin using `https` profile
+- Portal using `https` profile
 
 Relevant files:
 
 - `LioTecnica.slnLaunch.user`
 - `RHPortal.Api/RHPortal.Api/RHPortal.Api.csproj.user`
 - `LioTecnica.Web/LioTecnica.Web.csproj.user`
+- `LioTecnica.PortalVagas.Web/LioTecnica.PortalVagas.Web.csproj.user`
 
 ## Important configuration
 
@@ -256,8 +275,14 @@ Relevant files:
 ### Web
 
 - `Endpoints:RhApi`: API base URL
+- `Endpoints:PortalVagasWeb`: candidate portal public URL used by admin links
 - `EntraId:*`: optional Microsoft login
 - `Ops:ResetKey`: key used for operational reset
+
+### Candidate portal
+
+- `Endpoints:RhApi`: internal API base URL
+- `Endpoints:RhApiPublic`: public API base URL used by browser-side calls
 
 ## OpenAI
 
@@ -290,7 +315,8 @@ Without it, the rest of the application still works, but OpenAI-dependent featur
 Portal RH e uma aplicacao web para recrutamento e gestao de processos seletivos composta por:
 
 - `RHPortal.Api`: API ASP.NET Core 9 com Entity Framework Core, PostgreSQL, autenticacao JWT, multi-tenancy, SignalR, auditoria e logging operacional.
-- `LioTecnica.Web`: front-end ASP.NET Core MVC que consome a API, com autenticacao por cookie e integracao opcional com Microsoft Entra ID.
+- `LioTecnica.Web`: front-end ASP.NET Core MVC administrativo, com autenticacao por cookie e integracao opcional com Microsoft Entra ID.
+- `LioTecnica.PortalVagas.Web`: front-end ASP.NET Core MVC do portal do candidato, separado da experiencia administrativa.
 
 O projeto cobre fluxos de vagas, candidatos, gestores, departamentos, unidades, relatorios, agenda, inbox, notificacoes, templates de email e portal do candidato.
 
@@ -309,9 +335,10 @@ O projeto cobre fluxos de vagas, candidatos, gestores, departamentos, unidades, 
 
 ```text
 .
-|-- LioTecnica.Web/         # aplicacao web MVC
+|-- LioTecnica.Web/         # aplicacao web MVC administrativa
+|-- LioTecnica.PortalVagas.Web/ # aplicacao MVC do portal do candidato
 |-- RHPortal.Api/           # solucao e projeto da API
-|-- docker-compose.yml      # ambiente completo com db + api + web
+|-- docker-compose.yml      # ambiente completo com db + api + admin + portal
 |-- LOCAL_SETUP.md          # guia detalhado de configuracao local
 `-- LioTecnica.sln          # solution principal
 ```
@@ -322,7 +349,7 @@ O projeto cobre fluxos de vagas, candidatos, gestores, departamentos, unidades, 
 - autenticacao opcional via Microsoft Entra ID
 - multi-tenancy por `tenant`
 - CRUD de areas, departamentos, cargos, gestores, unidades e vagas
-- portal do candidato com perfil, documentos, agenda, preferencias, consentimento LGPD e notificacoes
+- portal do candidato separado com perfil, documentos, agenda, preferencias, consentimento LGPD e notificacoes
 - geracao de PDFs e renderizacao HTML de curriculo
 - fila e configuracao de emails
 - health check de API e banco
@@ -369,7 +396,7 @@ URL esperada:
 
 - `https://localhost:7073/swagger`
 
-### Subir o front-end
+### Subir o portal admin
 
 ```powershell
 cd LioTecnica.Web
@@ -380,6 +407,18 @@ dotnet run
 URL esperada:
 
 - `https://localhost:7091`
+
+### Subir o portal de vagas
+
+```powershell
+cd LioTecnica.PortalVagas.Web
+dotnet restore
+dotnet run
+```
+
+URL esperada:
+
+- `https://localhost:7092/acesso?tenantId=liotecnica`
 
 ## Primeira execucao em uma maquina nova
 
@@ -419,7 +458,8 @@ O repositorio ja inclui `docker-compose.yml` com:
 
 - PostgreSQL
 - API
-- front-end web
+- portal admin
+- portal de vagas
 - Dozzle para logs
 
 Para subir o ambiente:
@@ -430,7 +470,8 @@ docker compose up --build
 
 Servicos padrao:
 
-- web: `http://localhost:8080`
+- admin web: `http://localhost:8080`
+- portal vagas: `http://localhost:8081/acesso?tenantId=liotecnica`
 - api: `http://localhost:7073`
 - dozzle: `http://localhost:9999`
 
@@ -500,11 +541,12 @@ cd /opt/portal_rh
 docker compose --env-file .env.server -f docker-compose.server.yml ps
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal
 ```
 
 ## Health check e comportamento da tela de login
 
-O front chama `/api/health` para verificar a disponibilidade da API e do banco.
+O portal admin e o portal de vagas chamam `/api/health` para verificar a disponibilidade da API e do banco.
 
 Na tela de login:
 
@@ -518,15 +560,17 @@ Isso ajuda bastante quando os dois projetos sao iniciados juntos pelo Visual Stu
 
 O projeto foi ajustado para funcionar bem com multiple startup:
 
-- profile da solution: `API + WEB HTTPS`
+- profile da solution: `API + ADMIN + PORTAL HTTPS`
 - API usando o profile `https`
-- Web usando o profile `https`
+- Admin usando o profile `https`
+- Portal de vagas usando o profile `https`
 
 Arquivos relevantes:
 
 - `LioTecnica.slnLaunch.user`
 - `RHPortal.Api/RHPortal.Api/RHPortal.Api.csproj.user`
 - `LioTecnica.Web/LioTecnica.Web.csproj.user`
+- `LioTecnica.PortalVagas.Web/LioTecnica.PortalVagas.Web.csproj.user`
 
 ## Configuracoes importantes
 
@@ -543,8 +587,14 @@ Arquivos relevantes:
 ### Web
 
 - `Endpoints:RhApi`: URL base da API
+- `Endpoints:PortalVagasWeb`: URL publica do portal de vagas usada pelos links do admin
 - `EntraId:*`: login Microsoft opcional
 - `Ops:ResetKey`: chave usada no reset operacional
+
+### Portal de vagas
+
+- `Endpoints:RhApi`: URL interna da API
+- `Endpoints:RhApiPublic`: URL publica da API usada nas chamadas do navegador
 
 ## OpenAI - PT-BR
 

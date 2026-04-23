@@ -1,0 +1,17 @@
+{
+  "name": "liotecnica-web-tests",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "jsdom": "^24.0.0",
+    "vitest": "^2.1.8"
+  }
+}

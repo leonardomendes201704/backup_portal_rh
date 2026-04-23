@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>LioTecnica.PortalVagas.Web</AssemblyName>
+    <RootNamespace>LioTecnica.PortalVagas.Web</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="obj\**" />
+    <Compile Remove="bin\**" />
+    <Content Remove="obj\**" />
+    <Content Remove="bin\**" />
+    <EmbeddedResource Remove="obj\**" />
+    <EmbeddedResource Remove="bin\**" />
+    <None Remove="obj\**" />
+    <None Remove="bin\**" />
+    <Compile Remove="Controllers\AccountController.cs" />
+    <Compile Remove="Controllers\Admin*.cs" />
+    <Compile Remove="Controllers\AgendasController.cs" />
+    <Compile Remove="Controllers\AreasController.cs" />
+    <Compile Remove="Controllers\CandidatosController.cs" />
+    <Compile Remove="Controllers\CargosController.cs" />
+    <Compile Remove="Controllers\CategoriasController.cs" />
+    <Compile Remove="Controllers\CentrosCustosController.cs" />
+    <Compile Remove="Controllers\DashboardController.cs" />
+    <Compile Remove="Controllers\DepartamentosController.cs" />
+    <Compile Remove="Controllers\EntradaEmailPastaController.cs" />
+    <Compile Remove="Controllers\GestoresController.cs" />
+    <Compile Remove="Controllers\LookupsController.cs" />
+    <Compile Remove="Controllers\MatchingController.cs" />
+    <Compile Remove="Controllers\NotificationsController.cs" />
+    <Compile Remove="Controllers\OpsController.cs" />
+    <Compile Remove="Controllers\RelatoriosController.cs" />
+    <Compile Remove="Controllers\TriagemController.cs" />
+    <Compile Remove="Controllers\UnidadesController.cs" />
+    <Compile Remove="Controllers\UsuariosPerfisController.cs" />
+    <Compile Remove="Controllers\VagasController.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\images\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="wwwroot\images\4c9acf59-fb3c-4219-a01e-bb06de70ff5e.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.4" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.9.0" />
+  </ItemGroup>
+
+</Project>

@@ -35,6 +35,8 @@ services:
       Seed__InboxItems__Enabled: "true"
       Seed__Candidatos__DefaultPassword: "Mudar123@"
       Cors__WebOrigin: http://localhost:8080
+      Cors__AllowedOrigins__0: http://localhost:8080
+      Cors__AllowedOrigins__1: http://localhost:8081
     ports:
       - "7073:8080"
 
@@ -50,8 +52,24 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       Endpoints__RhApi: http://api:8080/
       Endpoints__RhApiPublic: http://localhost:7073/
+      Endpoints__PortalVagasWeb: http://localhost:8081/
     ports:
       - "8080:8080"
+
+  portal:
+    build:
+      context: .
+      dockerfile: LioTecnica.PortalVagas.Web/Dockerfile
+    container_name: liotecnica-portal-vagas
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Development
+      Endpoints__RhApi: http://api:8080/
+      Endpoints__RhApiPublic: http://localhost:7073/
+    ports:
+      - "8081:8080"
 
   dozzle:
     image: amir20/dozzle:latest

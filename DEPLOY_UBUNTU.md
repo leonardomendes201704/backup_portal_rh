@@ -4,7 +4,8 @@ Este guia sobe a stack completa em um servidor Linux Ubuntu usando:
 
 - PostgreSQL
 - `RHPortal.Api`
-- `LioTecnica.Web`
+- `LioTecnica.Web` (portal admin)
+- `LioTecnica.PortalVagas.Web` (portal do candidato)
 
 Com seed inicial habilitado na primeira subida.
 
@@ -46,6 +47,7 @@ Preencha pelo menos:
 - `OPS_RESET_KEY`
 - `EMAIL_ENCRYPTION_KEY`
 - `WEB_PUBLIC_ORIGIN`
+- `PORTAL_PUBLIC_ORIGIN`
 - `API_PUBLIC_URL`
 - `SEED_ADMIN_PASSWORD`
 
@@ -65,6 +67,7 @@ docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
 docker compose --env-file .env.server -f docker-compose.server.yml ps
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal
 ```
 
 ## 6. Seed inicial
@@ -87,12 +90,14 @@ docker compose --env-file .env.server -f docker-compose.server.yml up -d
 
 ## 7. Portas padrao
 
-- Web: `8080`
+- Web admin: `8080`
+- Portal vagas: `8081`
 - API: `7073`
 
 Exemplo:
 
 - `http://10.0.0.80:8080`
+- `http://10.0.0.80:8081/acesso?tenantId=liotecnica`
 - `http://10.0.0.80:7073/swagger`
 
 ## 8. Observacoes importantes
@@ -103,4 +108,7 @@ Exemplo:
   - `WEB_USE_HTTPS_REDIRECTION=true`
   - `WEB_USE_HSTS=true`
   - `WEB_SECURE_COOKIES=true`
+  - `PORTAL_USE_HTTPS_REDIRECTION=true`
+  - `PORTAL_USE_HSTS=true`
+  - `PORTAL_SECURE_COOKIES=true`
   - `API_USE_HTTPS_REDIRECTION=true`

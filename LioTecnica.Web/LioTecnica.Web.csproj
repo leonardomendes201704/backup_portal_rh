@@ -7,6 +7,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Controllers\PortalLocationsController.cs" />
+    <Compile Remove="Controllers\PortalVagasController.cs" />
+    <Content Remove="Views\PortalVagas\**" />
+    <Content Remove="wwwroot\css\portal-candidatos-access.css" />
+    <Content Remove="wwwroot\css\portal-vagas.css" />
+    <Content Remove="wwwroot\js\views\portal-vagas-access.js" />
+    <Content Remove="wwwroot\js\views\portal-vagas-profile-demo.js" />
+    <Content Remove="wwwroot\js\views\portal-vagas-profile.js" />
+    <Content Remove="wwwroot\js\views\portal-vagas\**" />
+    <None Remove="tests\e2e\portal-vagas\**" />
+    <None Remove="tests\unit\portal-vagas\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="wwwroot\images\" />
   </ItemGroup>
 

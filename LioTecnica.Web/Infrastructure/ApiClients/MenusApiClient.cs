@@ -60,10 +60,13 @@ public sealed class MenusApiClient
     public async Task<IReadOnlyList<MenuForCurrentUserViewModel>> ListForCurrentUserAsync(CancellationToken ct)
     {
         using var response = await _http.GetAsync("api/menus/for-current-user", ct);
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        if (response.StatusCode == HttpStatusCode.Unauthorized
+            || response.StatusCode == HttpStatusCode.ServiceUnavailable
+            || (int)response.StatusCode >= 500)
             return Array.Empty<MenuForCurrentUserViewModel>();
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+            return Array.Empty<MenuForCurrentUserViewModel>();
 
         return await response.Content.ReadFromJsonAsync<IReadOnlyList<MenuForCurrentUserViewModel>>(JsonOptions, ct)
                ?? Array.Empty<MenuForCurrentUserViewModel>();

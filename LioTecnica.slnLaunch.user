@@ -1,6 +1,6 @@
 [
   {
-    "Name": "API + WEB HTTPS",
+    "Name": "API + ADMIN + PORTAL HTTPS",
     "Projects": [
       {
         "Path": "RHPortal.Api\\RHPortal.Api\\RHPortal.Api.csproj",
@@ -8,6 +8,10 @@
       },
       {
         "Path": "LioTecnica.Web\\LioTecnica.Web.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "LioTecnica.PortalVagas.Web\\LioTecnica.PortalVagas.Web.csproj",
         "Action": "Start"
       }
     ]

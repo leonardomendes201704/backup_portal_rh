@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>..\artifacts\obj\LioTecnica.PortalVagas.Web\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>..\artifacts\obj\LioTecnica.PortalVagas.Web\</MSBuildProjectExtensionsPath>
+    <BaseOutputPath>..\artifacts\bin\LioTecnica.PortalVagas.Web\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

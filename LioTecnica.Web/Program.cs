@@ -50,16 +50,6 @@ var authBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefault
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = secureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
         options.Cookie.SameSite = SameSiteMode.Lax;
-    })
-    .AddCookie(CandidateAuthDefaults.Scheme, options =>
-    {
-        options.LoginPath = "/PortalVagas/Acesso";
-        options.AccessDeniedPath = "/PortalVagas/Acesso";
-        options.SlidingExpiration = true;
-        options.Cookie.Name = "PortalCandidato";
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = secureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
-        options.Cookie.SameSite = SameSiteMode.Lax;
     });
 
 if (entraEnabled && !string.IsNullOrWhiteSpace(entraClientId))
@@ -209,21 +199,6 @@ builder.Services.AddHttpClient<AuthApiClient>(http =>
 {
     http.BaseAddress = new Uri(builder.Configuration["Endpoints:RhApi"]!);
 }).AddHttpMessageHandler<ApiAuthenticationHandler>();
-
-builder.Services.AddHttpClient<PortalAuthApiClient>(http =>
-{
-    http.BaseAddress = new Uri(builder.Configuration["Endpoints:RhApi"]!);
-});
-
-builder.Services.AddHttpClient<PortalCandidatesApiClient>(http =>
-{
-    http.BaseAddress = new Uri(builder.Configuration["Endpoints:RhApi"]!);
-});
-
-builder.Services.AddHttpClient<PortalLocationApiClient>(http =>
-{
-    http.BaseAddress = new Uri("https://brasilapi.com.br/");
-});
 
 builder.Services.AddHttpClient<UsersApiClient>(http =>
 {

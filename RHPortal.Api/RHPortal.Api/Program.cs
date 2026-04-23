@@ -110,10 +110,23 @@ builder.Services.AddHttpClient("OpenAI", (sp, client) =>
 });
 builder.Services.AddCors(options =>
 {
-    // Necessario para o SignalR funcionar quando o front roda em outro host/porta.
-    var webOrigin = builder.Configuration["Cors:WebOrigin"] ?? "https://localhost:7091";
+    // Necessario para o SignalR e para o portal web funcionarem quando os fronts rodam em portas separadas.
+    var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+    var legacyOrigin = builder.Configuration["Cors:WebOrigin"];
+    var origins = (configuredOrigins ?? Array.Empty<string>())
+        .Concat(string.IsNullOrWhiteSpace(legacyOrigin) ? Array.Empty<string>() : new[] { legacyOrigin })
+        .Concat([
+            "https://localhost:7091",
+            "http://localhost:5051",
+            "https://localhost:7092",
+            "http://localhost:5052"
+        ])
+        .Where(origin => !string.IsNullOrWhiteSpace(origin))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
     options.AddPolicy("WebApp", policy =>
-        policy.WithOrigins(webOrigin)
+        policy.WithOrigins(origins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());

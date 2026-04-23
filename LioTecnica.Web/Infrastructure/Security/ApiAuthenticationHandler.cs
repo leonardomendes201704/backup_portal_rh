@@ -52,6 +52,15 @@ public sealed class ApiAuthenticationHandler : DelegatingHandler
         {
             response = await base.SendAsync(request, cancellationToken);
         }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+            {
+                RequestMessage = request,
+                ReasonPhrase = "API timeout",
+                Content = new StringContent(ex.Message)
+            };
+        }
         catch (HttpRequestException ex)
         {
             response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)

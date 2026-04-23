@@ -3,6 +3,8 @@
 @{
     var linkClass = ViewData["LinkClass"]?.ToString() ?? "nav-link";
     var tenantId = User?.FindFirst("tenant")?.Value;
+    var configuration = Context.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration;
+    var portalBaseUrl = configuration?["Endpoints:PortalVagasWeb"]?.TrimEnd('/');
     var adminItems = Model.Where(x => x.Route.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase)).ToList();
     var operationalItems = Model.Where(x => !x.Route.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase)).ToList();
 }
@@ -20,7 +22,11 @@
             var href = menu.Route;
             if (!string.IsNullOrWhiteSpace(tenantId) && string.Equals(menu.Route, "/PortalVagas", StringComparison.OrdinalIgnoreCase))
             {
-                href = $"{menu.Route}?tenantId={tenantId}";
+                href = !string.IsNullOrWhiteSpace(portalBaseUrl)
+                    ? $"{portalBaseUrl}/?tenantId={tenantId}"
+                    : $"{menu.Route}?tenantId={tenantId}";
+                target = "_blank";
+                rel = "noopener";
             }
             <a class="@linkClass nav-child @ViewHelpers.NavActiveByPath(ViewContext, menu.Route)" href="@href" target="@target" rel="@rel">
                 <i class="bi @menu.Icon"></i>@menu.DisplayName
@@ -41,7 +47,11 @@
             var href = menu.Route;
             if (!string.IsNullOrWhiteSpace(tenantId) && string.Equals(menu.Route, "/PortalVagas", StringComparison.OrdinalIgnoreCase))
             {
-                href = $"{menu.Route}?tenantId={tenantId}";
+                href = !string.IsNullOrWhiteSpace(portalBaseUrl)
+                    ? $"{portalBaseUrl}/?tenantId={tenantId}"
+                    : $"{menu.Route}?tenantId={tenantId}";
+                target = "_blank";
+                rel = "noopener";
             }
             <a class="@linkClass nav-child @ViewHelpers.NavActiveByPath(ViewContext, menu.Route)" href="@href" target="@target" rel="@rel">
                 <i class="bi @menu.Icon"></i>@menu.DisplayName
