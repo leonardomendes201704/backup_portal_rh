@@ -127,6 +127,15 @@
         .status-warn { background: #f5a524; }
         .status-down { background: #e23b3b; }
         .status-unknown { background: #cbd5e1; }
+        .status-pulse {
+            animation: health-pulse 1.2s ease-in-out infinite;
+        }
+        .health-message {
+            margin-top: 8px;
+            min-height: 20px;
+            font-size: .82rem;
+            color: var(--muted);
+        }
         .login-disabled {
             opacity: .72;
             pointer-events: none;
@@ -140,6 +149,11 @@
         .btn-loading .spinner-border {
             width: 1rem;
             height: 1rem;
+        }
+        @@keyframes health-pulse {
+            0% { transform: scale(1); opacity: .9; }
+            50% { transform: scale(1.18); opacity: .45; }
+            100% { transform: scale(1); opacity: .9; }
         }
 
         @@media (max-width: 991px) {
@@ -199,6 +213,7 @@
                     <span class="fw-semibold">DB</span>
                     <span class="health-dot status-unknown" data-health="db" title="DB: unknown"></span>
                 </div>
+                <div class="health-message" id="loginHealthMessage">Verificando conectividade...</div>
             </div>
         </section>
         <section class="login-right">
@@ -214,9 +229,12 @@
             const submitBtn = document.getElementById("loginSubmit");
             const entraBtn = document.getElementById("entraLoginBtn");
             const inputs = Array.from(document.querySelectorAll("#loginForm input"));
+            const editableInputs = inputs.filter(el => el.type !== "hidden");
             const buttons = Array.from(document.querySelectorAll("#loginForm button"));
+            let isSubmitting = false;
             if (form && submitBtn) {
                 form.addEventListener("submit", () => {
+                    isSubmitting = true;
                     inputs.forEach(el => el.readOnly = true);
                     buttons.forEach(el => el.disabled = true);
                     submitBtn.classList.add("btn-loading");
@@ -243,7 +261,10 @@
             if (!root) return;
             const apiDot = root.querySelector('[data-health="api"]');
             const dbDot = root.querySelector('[data-health="db"]');
+            const healthMessage = document.getElementById("loginHealthMessage");
             const statusClasses = ["status-ok", "status-warn", "status-down", "status-unknown"];
+            const pulseClass = "status-pulse";
+            let healthTimer;
 
             const normalize = (value) => (value ?? "").toString().trim().toLowerCase();
             const mapStatus = (value) => {
@@ -257,8 +278,38 @@
             const setDot = (dot, status, label) => {
                 if (!dot) return;
                 statusClasses.forEach(cls => dot.classList.remove(cls));
+                dot.classList.remove(pulseClass);
                 dot.classList.add(status);
                 if (label) dot.title = label;
+            };
+
+            const setMessage = (text) => {
+                if (healthMessage) healthMessage.textContent = text;
+            };
+
+            const setFormEnabled = (enabled) => {
+                if (!form || isSubmitting) return;
+                form.classList.toggle("login-disabled", !enabled);
+                editableInputs.forEach(el => {
+                    el.disabled = !enabled;
+                    el.readOnly = !enabled;
+                });
+                if (submitBtn) submitBtn.disabled = !enabled;
+                if (entraBtn) entraBtn.disabled = !enabled;
+            };
+
+            const setPendingState = (message) => {
+                setDot(apiDot, "status-warn", "API: connecting");
+                setDot(dbDot, "status-warn", "DB: waiting");
+                apiDot?.classList.add(pulseClass);
+                dbDot?.classList.add(pulseClass);
+                setFormEnabled(false);
+                setMessage(message);
+            };
+
+            const scheduleUpdate = (delayMs) => {
+                window.clearTimeout(healthTimer);
+                healthTimer = window.setTimeout(update, delayMs);
             };
 
             const update = async () => {
@@ -267,20 +318,35 @@
                     const data = await res.json().catch(() => null);
                     if (!res.ok && !data) throw new Error(`health ${res.status}`);
                     const apiStatus = data?.status ?? "unknown";
-                    setDot(apiDot, mapStatus(apiStatus), `API: ${apiStatus}`);
+                    const apiHealthy = normalize(apiStatus) === "healthy";
+                    setDot(apiDot, apiHealthy ? "status-ok" : "status-warn", `API: ${apiStatus}`);
+                    if (!apiHealthy) apiDot?.classList.add(pulseClass);
 
                     const checks = Array.isArray(data?.checks) ? data.checks : [];
                     const dbCheck = checks.find(c => normalize(c?.name) === "database");
                     const dbStatus = dbCheck?.status ?? "unknown";
-                    setDot(dbDot, mapStatus(dbStatus), `DB: ${dbStatus}`);
+                    const dbHealthy = normalize(dbStatus) === "healthy";
+                    setDot(dbDot, dbHealthy ? "status-ok" : "status-warn", `DB: ${dbStatus}`);
+                    if (!dbHealthy) dbDot?.classList.add(pulseClass);
+
+                    if (apiHealthy && dbHealthy) {
+                        setFormEnabled(true);
+                        setMessage("API e banco conectados. Login liberado.");
+                        scheduleUpdate(30000);
+                        return;
+                    }
+
+                    setFormEnabled(false);
+                    setMessage("Conectando aos servi\u00e7os locais... nova tentativa em alguns segundos.");
+                    scheduleUpdate(3000);
                 } catch (err) {
-                    setDot(apiDot, "status-down", "API: down");
-                    setDot(dbDot, "status-down", "DB: down");
+                    setPendingState("API ainda est\u00e1 subindo. Tentando novamente em alguns segundos...");
+                    scheduleUpdate(3000);
                 }
             };
 
+            setPendingState("Verificando conectividade com API e banco...");
             update();
-            setInterval(update, 30000);
         })();
     </script>
 </body>

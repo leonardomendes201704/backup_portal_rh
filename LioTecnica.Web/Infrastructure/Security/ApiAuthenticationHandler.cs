@@ -47,7 +47,20 @@ public sealed class ApiAuthenticationHandler : DelegatingHandler
             request.Headers.TryAddWithoutValidation(OpsResetHeader, resetKey);
         }
 
-        var response = await base.SendAsync(request, cancellationToken);
+        HttpResponseMessage response;
+        try
+        {
+            response = await base.SendAsync(request, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+            {
+                RequestMessage = request,
+                ReasonPhrase = "API unavailable",
+                Content = new StringContent(ex.Message)
+            };
+        }
 
         // sinaliza para o middleware do front redirecionar quando a API der 401
         if (response.StatusCode == HttpStatusCode.Unauthorized && httpContext is not null)

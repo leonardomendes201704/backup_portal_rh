@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "API + WEB HTTPS",
+    "Projects": [
+      {
+        "Path": "RHPortal.Api\\RHPortal.Api\\RHPortal.Api.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "LioTecnica.Web\\LioTecnica.Web.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
