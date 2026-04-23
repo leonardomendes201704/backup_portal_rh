@@ -3,6 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -15,6 +16,12 @@ using RhPortal.Web.Infrastructure.ApiClients;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("entra-config.json", optional: true, reloadOnChange: true);
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // =========================
 // Localization (i18n)
@@ -32,6 +39,7 @@ builder.Services.AddHttpContextAccessor();
 
 var entraEnabled = builder.Configuration.GetValue<bool?>("EntraId:Enabled") ?? false;
 var entraClientId = builder.Configuration["EntraId:ClientId"];
+var secureCookies = builder.Configuration.GetValue<bool?>("TransportSecurity:SecureCookies") ?? !builder.Environment.IsDevelopment();
 
 var authBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -40,7 +48,7 @@ var authBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefault
         options.AccessDeniedPath = "/Account/Login";
         options.SlidingExpiration = true;
         options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SecurePolicy = secureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
         options.Cookie.SameSite = SameSiteMode.Lax;
     })
     .AddCookie(CandidateAuthDefaults.Scheme, options =>
@@ -50,7 +58,7 @@ var authBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefault
         options.SlidingExpiration = true;
         options.Cookie.Name = "PortalCandidato";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SecurePolicy = secureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
         options.Cookie.SameSite = SameSiteMode.Lax;
     });
 
@@ -285,6 +293,8 @@ builder.Services.AddHttpClient<OpsApiClient>(http =>
 .AddHttpMessageHandler<ApiAuthenticationHandler>();
 
 var app = builder.Build();
+var useHsts = app.Configuration.GetValue<bool?>("TransportSecurity:UseHsts") ?? !app.Environment.IsDevelopment();
+var useHttpsRedirection = app.Configuration.GetValue<bool?>("TransportSecurity:UseHttpsRedirection") ?? !app.Environment.IsDevelopment();
 
 // =========================
 // Request Localization (middleware)
@@ -311,14 +321,18 @@ var localizationOptions = new RequestLocalizationOptions
     }
 };
 app.UseRequestLocalization(localizationOptions);
+app.UseForwardedHeaders();
 
 app.UseExceptionHandler("/Home/Error");
-if (!app.Environment.IsDevelopment())
+if (useHsts)
 {
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+if (useHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
 app.UseStaticFiles();
 
 app.UseRouting();

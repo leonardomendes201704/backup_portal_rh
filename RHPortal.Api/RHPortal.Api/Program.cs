@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -56,6 +57,12 @@ using RhPortal.Api.Messaging.Email;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
@@ -327,6 +334,7 @@ var app = builder.Build();
 
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "App_Data"));
 await DbSeeder.MigrateAndSeedAsync(app.Services, app.Configuration, app.Environment);
+var useHttpsRedirection = app.Configuration.GetValue<bool?>("TransportSecurity:UseHttpsRedirection") ?? !app.Environment.IsDevelopment();
 
 var localizationOptions = app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>();
 
@@ -350,7 +358,12 @@ else
     app.UseExceptionHandler();
 }
 
-app.UseHttpsRedirection();
+app.UseForwardedHeaders();
+
+if (useHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("WebApp");
 app.UseMiddleware<TenantMiddleware>();

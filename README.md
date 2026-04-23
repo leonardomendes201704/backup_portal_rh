@@ -151,6 +151,70 @@ Note:
 
 - `docker-compose.yml` uses its own database credentials for the containerized environment, independent from the local non-Docker setup
 
+## Server deployment
+
+For Ubuntu server deployment, use:
+
+- `docker-compose.server.yml`
+- `.env.server`
+- [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md)
+
+### First publish
+
+1. Copy the repository to the server, for example to `/opt/portal_rh`.
+2. Create `.env.server` from `.env.server.example`.
+3. Fill the required secrets and public URLs.
+4. Start the stack:
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
+```
+
+5. Confirm the containers are healthy:
+
+```bash
+docker compose --env-file .env.server -f docker-compose.server.yml ps
+```
+
+### Seed control
+
+- First start: set `SEED_ENABLED=true`
+- After the initial data is created: change it to `SEED_ENABLED=false`
+
+To apply the change:
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml up -d api
+```
+
+### Updating the server after new code is pushed
+
+If the repository already exists on the server:
+
+```bash
+cd /opt/portal_rh
+git pull
+docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
+```
+
+If you changed only environment variables in `.env.server`:
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml up -d
+```
+
+### Useful checks
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml ps
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
+```
+
 ## Health check and login screen behavior
 
 The web app calls `/api/health` to verify API and database availability.
@@ -373,6 +437,70 @@ Servicos padrao:
 Observacao:
 
 - o `docker-compose.yml` usa credenciais proprias para o banco do ambiente em container, independentes do setup local fora do Docker
+
+## Publicacao no servidor
+
+Para publicacao em servidor Ubuntu, use:
+
+- `docker-compose.server.yml`
+- `.env.server`
+- [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md)
+
+### Primeira publicacao
+
+1. Copie o repositorio para o servidor, por exemplo em `/opt/portal_rh`.
+2. Crie o `.env.server` a partir de `.env.server.example`.
+3. Preencha os segredos obrigatorios e as URLs publicas.
+4. Suba a stack:
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
+```
+
+5. Confirme que os containers ficaram saudaveis:
+
+```bash
+docker compose --env-file .env.server -f docker-compose.server.yml ps
+```
+
+### Controle do seed
+
+- Primeira subida: `SEED_ENABLED=true`
+- Depois que os dados iniciais forem criados: altere para `SEED_ENABLED=false`
+
+Para aplicar a mudanca:
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml up -d api
+```
+
+### Como atualizar o servidor depois de subir novas mudancas
+
+Se o repositorio ja estiver no servidor:
+
+```bash
+cd /opt/portal_rh
+git pull
+docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
+```
+
+Se voce mudou apenas variaveis no `.env.server`:
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml up -d
+```
+
+### Comandos uteis
+
+```bash
+cd /opt/portal_rh
+docker compose --env-file .env.server -f docker-compose.server.yml ps
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
+```
 
 ## Health check e comportamento da tela de login
 

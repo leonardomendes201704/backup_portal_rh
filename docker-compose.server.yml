@@ -1,0 +1,100 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: rhportal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - rhportal_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  api:
+    build:
+      context: .
+      dockerfile: RHPortal.Api/Dockerfile
+    container_name: rhportal-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__Default: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      Ops__ResetKey: ${OPS_RESET_KEY}
+      Cors__WebOrigin: ${WEB_PUBLIC_ORIGIN}
+      InboxFolder__RootPath: /app/App_Data/Inbox
+      TransportSecurity__UseHttpsRedirection: ${API_USE_HTTPS_REDIRECTION:-false}
+      Seed__Enabled: ${SEED_ENABLED:-true}
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD}
+      Seed__Vagas__Enabled: ${SEED_VAGAS_ENABLED:-true}
+      Seed__Candidatos__Enabled: ${SEED_CANDIDATOS_ENABLED:-true}
+      Seed__InboxItems__Enabled: ${SEED_INBOX_ENABLED:-true}
+      Seed__Candidatos__DefaultPassword: ${SEED_CANDIDATE_PASSWORD}
+      OpenAI__ApiKey: ${OPENAI_API_KEY:-}
+      OpenAI__BaseUrl: ${OPENAI_BASE_URL:-https://api.openai.com/v1/}
+      OpenAI__Model: ${OPENAI_MODEL:-gpt-4o-mini}
+      OpenAI__TimeoutSeconds: ${OPENAI_TIMEOUT_SECONDS:-60}
+      OpenAI__MaxFileSizeBytes: ${OPENAI_MAX_FILE_SIZE_BYTES:-10485760}
+      OpenAI__AllowedExtensions__0: .pdf
+      OpenAI__AllowedExtensions__1: .docx
+      EmailConfig__EncryptionKey: ${EMAIL_ENCRYPTION_KEY}
+    ports:
+      - "${API_PUBLIC_PORT:-7073}:8080"
+    volumes:
+      - rhportal_api_data:/app/App_Data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: liotecnica-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      Endpoints__RhApi: http://api:8080/
+      Endpoints__RhApiPublic: ${API_PUBLIC_URL}
+      Ops__ResetKey: ${OPS_RESET_KEY}
+      TransportSecurity__UseHttpsRedirection: ${WEB_USE_HTTPS_REDIRECTION:-false}
+      TransportSecurity__UseHsts: ${WEB_USE_HSTS:-false}
+      TransportSecurity__SecureCookies: ${WEB_SECURE_COOKIES:-false}
+      EntraId__Enabled: ${ENTRA_ENABLED:-false}
+      EntraId__Authority: ${ENTRA_AUTHORITY:-https://login.microsoftonline.com/common/v2.0}
+      EntraId__ClientId: ${ENTRA_CLIENT_ID:-}
+      EntraId__ClientSecret: ${ENTRA_CLIENT_SECRET:-}
+      EntraId__CallbackPath: ${ENTRA_CALLBACK_PATH:-/signin-entra}
+    ports:
+      - "${WEB_PUBLIC_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/Account/Login > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  rhportal_db:
+  rhportal_api_data:
