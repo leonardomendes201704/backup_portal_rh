@@ -61,7 +61,18 @@ public sealed class ResumeParserService : IResumeParserService
 
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
-            throw new InvalidOperationException("OpenAI API key ausente.");
+            _logger.LogWarning("ResumeParserService executado sem OpenAI API key. Retornando parse vazio com warning.");
+            return new ResumeParsedDto
+            {
+                Warnings = ["openai_api_key_missing"],
+                MissingFields = ["candidate", "education", "experience", "skills", "certifications"],
+                Candidate = new CandidateDto(),
+                Education = [],
+                Experience = [],
+                Skills = [],
+                Certifications = [],
+                Evidence = []
+            };
         }
 
         var requestPayload = BuildOpenAIRequest(extractedText, _options.Model);

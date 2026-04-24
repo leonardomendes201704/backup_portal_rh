@@ -44,7 +44,15 @@ public sealed class ProfileCompletionService : IProfileCompletionService
     public async Task<ProfileCompletionResult> ComputeAsync(object snapshot, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
-            throw new InvalidOperationException("OpenAI API key ausente.");
+        {
+            _logger.LogWarning("ProfileCompletionService executado sem OpenAI API key. Retornando completion vazio.");
+            return new ProfileCompletionResult(
+                new Dictionary<string, int>(),
+                0,
+                ["openai_api_key_missing"],
+                new Dictionary<string, string>(),
+                Array.Empty<CompletionSuggestion>());
+        }
 
         var requestPayload = BuildOpenAIRequest(snapshot, _options.Model);
         var json = JsonSerializer.Serialize(requestPayload, new JsonSerializerOptions

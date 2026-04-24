@@ -38,7 +38,10 @@ public sealed class PortalJobMatchService : IPortalJobMatchService
     public async Task<JobMatchResult> ComputeAsync(object snapshot, bool includeReasons, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
-            throw new InvalidOperationException("OpenAI API key ausente.");
+        {
+            _logger.LogWarning("PortalJobMatchService executado sem OpenAI API key. Retornando matches vazios.");
+            return new JobMatchResult(Array.Empty<JobMatchItem>());
+        }
 
         var requestPayload = BuildOpenAIRequest(snapshot, _options.Model, includeReasons);
         var json = JsonSerializer.Serialize(requestPayload, new JsonSerializerOptions

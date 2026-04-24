@@ -343,6 +343,14 @@ public sealed class PortalCandidatesController : ControllerBase
         {
             return StatusCode(StatusCodes.Status504GatewayTimeout, new { message = "Tempo excedido ao calcular percentuais." });
         }
+        catch (InvalidOperationException ex) when (IsMissingOpenAiKey(ex))
+        {
+            return Ok(BuildEmptyProfileCompletionResponse());
+        }
+        catch (OpenAIServiceException)
+        {
+            return Ok(BuildEmptyProfileCompletionResponse(["openai_unavailable"]));
+        }
     }
 
     /// <summary>
@@ -533,9 +541,25 @@ public sealed class PortalCandidatesController : ControllerBase
         }
         catch (OpenAIServiceException ex)
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
+            return Ok(new PortalCandidateJobMatchResponse(Array.Empty<PortalCandidateJobMatchItem>()));
+        }
+        catch (InvalidOperationException ex) when (IsMissingOpenAiKey(ex))
+        {
+            return Ok(new PortalCandidateJobMatchResponse(Array.Empty<PortalCandidateJobMatchItem>()));
         }
     }
+
+    private static bool IsMissingOpenAiKey(InvalidOperationException ex)
+        => ex.Message.Contains("OpenAI API key ausente", StringComparison.OrdinalIgnoreCase);
+
+    private static PortalCandidateProfileCompletionResponse BuildEmptyProfileCompletionResponse(
+        IReadOnlyList<string>? warnings = null)
+        => new(
+            new Dictionary<string, int>(),
+            0,
+            warnings ?? ["openai_api_key_missing"],
+            new Dictionary<string, string>(),
+            Array.Empty<PortalCandidateProfileCompletionSuggestion>());
 
     private static async Task<PortalCandidateJobMatchResponse> ComputeMatchesAsync(
         object snapshot,

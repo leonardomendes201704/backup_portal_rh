@@ -175,11 +175,101 @@ type WorkspaceState = {
   lgpd: PortalLgpd | null
 }
 
+type AccessLanguage = 'pt-BR' | 'en-US' | 'es-ES'
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'https://localhost:7073'
 const DEFAULT_TENANT = (import.meta.env.VITE_DEFAULT_TENANT as string | undefined) ?? 'liotecnica'
 const TENANT_QUERY_KEY = 'tenantId'
+const ACCESS_LANGUAGE_STORAGE_KEY = 'portal-vagas-lang'
 const DEV_PROXY_BASE_URL = ''
 let resolvedApiBaseUrl: string | null = null
+
+const ACCESS_TRANSLATIONS: Record<AccessLanguage, Record<string, string>> = {
+  'pt-BR': {
+    helpLink: 'Precisa de ajuda?',
+    title: 'Acesse sua conta',
+    subtitle: 'Faça o seu login ou crie a sua conta. É simples e rápido.',
+    tenant: 'Tenant',
+    email: 'E-mail',
+    password: 'Senha',
+    loginButton: 'Entrar no portal',
+    processing: 'Processando...',
+    createHint: 'Ainda não possui acesso?',
+    createAccess: 'Criar acesso',
+    languageLabel: 'Idioma do perfil',
+    helpTitle: 'Como funciona o processo',
+    helpSubtitle: 'Etapas para acompanhar sua candidatura.',
+    helpStep1: 'Cadastro rápido e perfil único.',
+    helpStep2: 'Triagem e retorno em até 5 dias.',
+    helpStep3: 'Entrevista com gestor.',
+    helpStep4: 'Proposta e onboarding.',
+    close: 'Fechar',
+    registerTitle: 'Criar acesso',
+    registerSubtitle: 'Preencha os dados básicos para entrar no portal.',
+    fullName: 'Nome completo',
+    phone: 'Telefone',
+    city: 'Cidade',
+    uf: 'UF',
+    confirmPassword: 'Confirmar senha',
+    cancel: 'Cancelar',
+  },
+  'en-US': {
+    helpLink: 'Need help?',
+    title: 'Access your account',
+    subtitle: 'Log in or create your account. It is simple and fast.',
+    tenant: 'Tenant',
+    email: 'Email',
+    password: 'Password',
+    loginButton: 'Enter the portal',
+    processing: 'Processing...',
+    createHint: 'Do not have access yet?',
+    createAccess: 'Create access',
+    languageLabel: 'Profile language',
+    helpTitle: 'How the process works',
+    helpSubtitle: 'Steps to follow your application.',
+    helpStep1: 'Quick signup and a single profile.',
+    helpStep2: 'Screening and response within 5 days.',
+    helpStep3: 'Interview with the manager.',
+    helpStep4: 'Offer and onboarding.',
+    close: 'Close',
+    registerTitle: 'Create access',
+    registerSubtitle: 'Fill in the basic data to enter the portal.',
+    fullName: 'Full name',
+    phone: 'Phone',
+    city: 'City',
+    uf: 'State',
+    confirmPassword: 'Confirm password',
+    cancel: 'Cancel',
+  },
+  'es-ES': {
+    helpLink: '¿Necesitas ayuda?',
+    title: 'Accede a tu cuenta',
+    subtitle: 'Inicia sesión o crea tu cuenta. Es simple y rápido.',
+    tenant: 'Tenant',
+    email: 'Correo',
+    password: 'Contraseña',
+    loginButton: 'Entrar al portal',
+    processing: 'Procesando...',
+    createHint: '¿Aún no tienes acceso?',
+    createAccess: 'Crear acceso',
+    languageLabel: 'Idioma del perfil',
+    helpTitle: 'Cómo funciona el proceso',
+    helpSubtitle: 'Pasos para seguir tu candidatura.',
+    helpStep1: 'Registro rápido y perfil único.',
+    helpStep2: 'Filtrado y respuesta en hasta 5 días.',
+    helpStep3: 'Entrevista con el responsable.',
+    helpStep4: 'Oferta e incorporación.',
+    close: 'Cerrar',
+    registerTitle: 'Crear acceso',
+    registerSubtitle: 'Completa los datos básicos para entrar al portal.',
+    fullName: 'Nombre completo',
+    phone: 'Teléfono',
+    city: 'Ciudad',
+    uf: 'Estado',
+    confirmPassword: 'Confirmar contraseña',
+    cancel: 'Cancelar',
+  },
+}
 
 function App() {
   return (
@@ -191,6 +281,7 @@ function App() {
 
 function PortalApp() {
   const location = useLocation()
+  const isAccessRoute = location.pathname === '/acesso'
   const tenantId = useMemo(() => {
     const params = new URLSearchParams(location.search)
     return (params.get(TENANT_QUERY_KEY) ?? DEFAULT_TENANT).trim().toLowerCase()
@@ -199,6 +290,8 @@ function PortalApp() {
   const [session, setSession] = useState<AuthSession | null>(() => loadStoredSession(storageKey))
   const [initializing, setInitializing] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
   useEffect(() => {
     setSession(loadStoredSession(storageKey))
   }, [storageKey])
@@ -244,38 +337,74 @@ function PortalApp() {
     const timeout = window.setTimeout(() => setAuthError(null), 5000)
     return () => window.clearTimeout(timeout)
   }, [authError])
+  useEffect(() => {
+    setUserMenuOpen(false)
+  }, [location.pathname, location.search])
   const initials = session ? getInitials(session.candidate.nome) : 'LT'
   return (
-    <div className="portal-root">
-      <div className="header-wrapper">
-        <nav className="portal-navbar">
-          <div className="portal-container portal-nav-inner">
-            <Link className="portal-brand" to={withTenant('/', tenantId)}>
-              <i className="fas fa-flask" aria-hidden="true"></i>
-              <span>LT Portal de Vagas</span>
-            </Link>
-            <div className="portal-actions">
-              {session ? (
-                <>
-                  <Link className="portal-action-link" to={withTenant('/candidato', tenantId)}>Meu espaço</Link>
-                  <button className="portal-user-btn" type="button" onClick={() => void signOutPortalSession(authContext)}>
-                    <span className="portal-user-avatar">{initials}</span>
-                    <span className="portal-user-copy">
-                      <span className="portal-user-name">{session.candidate.nome}</span>
-                      <span className="portal-user-email">{session.candidate.email}</span>
-                    </span>
-                    <i className="fas fa-chevron-down portal-user-chevron" aria-hidden="true"></i>
-                  </button>
-                </>
-              ) : (
-                <Link className="portal-login-pill" to={withTenant('/acesso', tenantId)}>
-                  Entrar no portal
-                </Link>
-              )}
+    <div className={`portal-root${isAccessRoute ? ' access-route' : ''}`}>
+      {!isAccessRoute ? (
+        <div className="header-wrapper">
+          <nav className="portal-navbar">
+            <div className="portal-container portal-nav-inner">
+              <Link className="portal-brand" to={withTenant('/', tenantId)}>
+                <i className="fas fa-flask" aria-hidden="true"></i>
+                <span>LT Portal de Vagas</span>
+              </Link>
+              <div className="portal-actions">
+                {session ? (
+                  <div className="portal-user-menu">
+                    <Link className="portal-action-link" to={withTenant('/candidato', tenantId)}>Meu espaço</Link>
+                    <button
+                      className="portal-user-btn"
+                      type="button"
+                      aria-expanded={userMenuOpen}
+                      aria-haspopup="menu"
+                      onClick={() => setUserMenuOpen((value) => !value)}
+                    >
+                      <span className="portal-user-avatar">{initials}</span>
+                      <span className="portal-user-copy">
+                        <span className="portal-user-name">{session.candidate.nome}</span>
+                        <span className="portal-user-email">{session.candidate.email}</span>
+                      </span>
+                      <i className="fas fa-chevron-down portal-user-chevron" aria-hidden="true"></i>
+                    </button>
+                    {userMenuOpen ? (
+                      <div className="portal-user-dropdown" role="menu">
+                        <button
+                          className="portal-user-dropdown-item"
+                          type="button"
+                          onClick={() => {
+                            setProfileModalOpen(true)
+                            setUserMenuOpen(false)
+                          }}
+                        >
+                          Ver perfil
+                        </button>
+                        <div className="portal-user-dropdown-divider" />
+                        <button
+                          className="portal-user-dropdown-item danger"
+                          type="button"
+                          onClick={() => {
+                            setUserMenuOpen(false)
+                            void signOutPortalSession(authContext)
+                          }}
+                        >
+                          Sair
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <Link className="portal-login-pill" to={withTenant('/acesso', tenantId)}>
+                    Entrar no portal
+                  </Link>
+                )}
+              </div>
             </div>
-          </div>
-        </nav>
-      </div>
+          </nav>
+        </div>
+      ) : null}
       {authError ? <div className="toast-banner error">{authError}</div> : null}
       <Routes>
         <Route path="/acesso" element={<AccessPage ctx={authContext} />} />
@@ -293,15 +422,26 @@ function PortalApp() {
           }
         />
       </Routes>
+      {session && profileModalOpen ? (
+        <CandidateProfileModal ctx={authContext} onClose={() => setProfileModalOpen(false)} />
+      ) : null}
     </div>
   )
 }
 
 function AccessPage({ ctx }: { ctx: AuthContext }) {
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [pending, setPending] = useState(false)
+  const [registerPending, setRegisterPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [registerError, setRegisterError] = useState<string | null>(null)
+  const [showHelpModal, setShowHelpModal] = useState(false)
+  const [showRegisterModal, setShowRegisterModal] = useState(false)
+  const [language, setLanguage] = useState<AccessLanguage>(() => {
+    if (typeof window === 'undefined') return 'pt-BR'
+    const stored = window.localStorage.getItem(ACCESS_LANGUAGE_STORAGE_KEY)
+    return stored === 'en-US' || stored === 'es-ES' || stored === 'pt-BR' ? stored : 'pt-BR'
+  })
   const [login, setLogin] = useState({ email: '', password: '' })
   const [register, setRegister] = useState({
     nome: '',
@@ -312,6 +452,12 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
     password: '',
     confirmPassword: '',
   })
+  const text = ACCESS_TRANSLATIONS[language]
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(ACCESS_LANGUAGE_STORAGE_KEY, language)
+  }, [language])
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -319,19 +465,28 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
     setError(null)
 
     try {
-      if (mode === 'login') {
-        const session = await portalRequest<AuthSession>(ctx.tenantId, '/api/public/portal-auth/login', {
-          method: 'POST',
-          body: JSON.stringify({
-            email: login.email.trim(),
-            password: login.password,
-          }),
-        })
-        ctx.setSession(session)
-        navigate(withTenant('/candidato', ctx.tenantId))
-        return
-      }
+      const session = await portalRequest<AuthSession>(ctx.tenantId, '/api/public/portal-auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: login.email.trim(),
+          password: login.password,
+        }),
+      })
+      ctx.setSession(session)
+      navigate(withTenant('/', ctx.tenantId))
+    } catch (err) {
+      setError(readError(err))
+    } finally {
+      setPending(false)
+    }
+  }
 
+  async function onRegisterSubmit(event: FormEvent) {
+    event.preventDefault()
+    setRegisterPending(true)
+    setRegisterError(null)
+
+    try {
       if (register.password !== register.confirmPassword) {
         throw new Error('As senhas não conferem.')
       }
@@ -347,108 +502,172 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
           password: register.password,
         }),
       })
+
       ctx.setSession(session)
-      navigate(withTenant('/candidato', ctx.tenantId))
+      setShowRegisterModal(false)
+      navigate(withTenant('/', ctx.tenantId))
     } catch (err) {
-      setError(readError(err))
+      setRegisterError(readError(err))
     } finally {
-      setPending(false)
+      setRegisterPending(false)
     }
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-hero">
-        <div className="auth-copy">
-          <div className="eyebrow">Acesso do candidato</div>
-          <h2>Entre ou crie sua conta para acompanhar cada etapa da sua candidatura.</h2>
-          <p>
-            Esta versão React conversa direto com a API pública do portal, mantém sua sessão por token
-            e já nasce preparada para rodar em paralelo com o portal MVC legado.
-          </p>
-          <div className="language-flags">
-            <img src="/images/flags/flag-br.svg" alt="Português" />
-            <img src="/images/flags/flag-us.svg" alt="English" />
-            <img src="/images/flags/flag-es.svg" alt="Español" />
+    <main className="auth-page-shell">
+      <header className="auth-page-header">
+        <div className="auth-page-container auth-page-header-inner">
+          <div className="auth-page-brand-spacer" aria-hidden="true"></div>
+          <button className="auth-page-help" type="button" onClick={() => setShowHelpModal(true)}>
+            {text.helpLink}
+          </button>
+        </div>
+      </header>
+
+      <section className="auth-page-body">
+        <div className="auth-page-container auth-page-grid">
+          <form className="auth-card auth-card-main" onSubmit={onSubmit}>
+            <div className="auth-title">
+              <img className="auth-logo-img" src="/images/logo-liotecnica.png" alt="Liotecnica" />
+              <h1>{text.title}</h1>
+              <h2>{text.subtitle}</h2>
+            </div>
+
+            <label className="auth-field">
+              <span>{text.tenant}</span>
+              <input value={ctx.tenantId} readOnly />
+            </label>
+
+            <label className="auth-field">
+              <span>{text.email}</span>
+              <input type="email" value={login.email} onChange={(e) => setLogin((v) => ({ ...v, email: e.target.value }))} required />
+            </label>
+            <label className="auth-field">
+              <span>{text.password}</span>
+              <input type="password" value={login.password} onChange={(e) => setLogin((v) => ({ ...v, password: e.target.value }))} required />
+            </label>
+
+            {error ? <div className="inline-alert error auth-inline-alert">{error}</div> : null}
+
+            <button className="auth-submit" type="submit" disabled={pending}>
+              {pending ? text.processing : text.loginButton}
+            </button>
+
+            <div className="auth-links">
+              <span className="auth-note">{text.createHint}</span>
+              <button className="auth-secondary-btn" type="button" onClick={() => setShowRegisterModal(true)}>
+                {text.createAccess}
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <footer className="auth-language-footer">
+        <div className="auth-page-container auth-language-inner">
+          <span className="auth-language-label">{text.languageLabel}</span>
+          <div className="language-flags auth-language-flags">
+            <button type="button" className={`auth-flag-btn${language === 'pt-BR' ? ' is-active' : ''}`} onClick={() => setLanguage('pt-BR')} title="Português">
+              <img src="/images/flags/flag-br.svg" alt="Português" />
+            </button>
+            <button type="button" className={`auth-flag-btn${language === 'en-US' ? ' is-active' : ''}`} onClick={() => setLanguage('en-US')} title="English">
+              <img src="/images/flags/flag-us.svg" alt="English" />
+            </button>
+            <button type="button" className={`auth-flag-btn${language === 'es-ES' ? ' is-active' : ''}`} onClick={() => setLanguage('es-ES')} title="Español">
+              <img src="/images/flags/flag-es.svg" alt="Español" />
+            </button>
           </div>
         </div>
-        <form className="auth-card" onSubmit={onSubmit}>
-          <div className="segmented">
-            <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>
-              Login
-            </button>
-            <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>
-              Criar acesso
-            </button>
+      </footer>
+
+      {showHelpModal ? (
+        <div className="auth-modal-backdrop" onClick={() => setShowHelpModal(false)}>
+          <div className="auth-help-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="auth-help-modal-header">
+              <div>
+                <h2>{text.helpTitle}</h2>
+                <div className="auth-help-modal-subtitle">{text.helpSubtitle}</div>
+              </div>
+              <button type="button" className="auth-modal-close" onClick={() => setShowHelpModal(false)} aria-label="Fechar">
+                <i className="fas fa-times" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div className="auth-help-timeline">
+              <div className="auth-help-step"><span className="auth-help-dot"></span><span>{text.helpStep1}</span></div>
+              <div className="auth-help-step"><span className="auth-help-dot"></span><span>{text.helpStep2}</span></div>
+              <div className="auth-help-step"><span className="auth-help-dot"></span><span>{text.helpStep3}</span></div>
+              <div className="auth-help-step"><span className="auth-help-dot"></span><span>{text.helpStep4}</span></div>
+            </div>
+            <div className="auth-help-modal-footer">
+              <button className="auth-submit auth-modal-primary auth-submit-inline" type="button" onClick={() => setShowHelpModal(false)}>
+                {text.close}
+              </button>
+            </div>
           </div>
+        </div>
+      ) : null}
 
-          <label>
-            Tenant
-            <input value={ctx.tenantId} readOnly />
-          </label>
+      {showRegisterModal ? (
+        <div className="auth-modal-backdrop">
+          <div className="auth-help-modal auth-register-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="auth-help-modal-header">
+              <div>
+                <h2>{text.registerTitle}</h2>
+                <div className="auth-help-modal-subtitle">{text.registerSubtitle}</div>
+              </div>
+              <button type="button" className="auth-modal-close" onClick={() => setShowRegisterModal(false)} aria-label="Fechar">
+                <i className="fas fa-times" aria-hidden="true"></i>
+              </button>
+            </div>
 
-          {mode === 'login' ? (
-            <>
-              <label>
-                E-mail
-                <input type="email" value={login.email} onChange={(e) => setLogin((v) => ({ ...v, email: e.target.value }))} required />
-              </label>
-              <label>
-                Senha
-                <input type="password" value={login.password} onChange={(e) => setLogin((v) => ({ ...v, password: e.target.value }))} required />
-              </label>
-            </>
-          ) : (
-            <>
-              <label>
-                Nome completo
+            <form className="auth-register-form" onSubmit={onRegisterSubmit}>
+              <label className="auth-field">
+                <span>{text.fullName}</span>
                 <input value={register.nome} onChange={(e) => setRegister((v) => ({ ...v, nome: e.target.value }))} required />
               </label>
+              <label className="auth-field">
+                <span>{text.email}</span>
+                <input type="email" value={register.email} onChange={(e) => setRegister((v) => ({ ...v, email: e.target.value }))} required />
+              </label>
               <div className="grid two">
-                <label>
-                  E-mail
-                  <input type="email" value={register.email} onChange={(e) => setRegister((v) => ({ ...v, email: e.target.value }))} required />
-                </label>
-                <label>
-                  Telefone
+                <label className="auth-field">
+                  <span>{text.phone}</span>
                   <input value={register.fone} onChange={(e) => setRegister((v) => ({ ...v, fone: e.target.value }))} required />
                 </label>
-              </div>
-              <div className="grid two">
-                <label>
-                  Cidade
-                  <input value={register.cidade} onChange={(e) => setRegister((v) => ({ ...v, cidade: e.target.value }))} required />
-                </label>
-                <label>
-                  UF
+                <label className="auth-field">
+                  <span>{text.uf}</span>
                   <input maxLength={2} value={register.uf} onChange={(e) => setRegister((v) => ({ ...v, uf: e.target.value }))} required />
                 </label>
               </div>
+              <label className="auth-field">
+                <span>{text.city}</span>
+                <input value={register.cidade} onChange={(e) => setRegister((v) => ({ ...v, cidade: e.target.value }))} required />
+              </label>
               <div className="grid two">
-                <label>
-                  Senha
+                <label className="auth-field">
+                  <span>{text.password}</span>
                   <input type="password" value={register.password} onChange={(e) => setRegister((v) => ({ ...v, password: e.target.value }))} required />
                 </label>
-                <label>
-                  Confirmar senha
+                <label className="auth-field">
+                  <span>{text.confirmPassword}</span>
                   <input type="password" value={register.confirmPassword} onChange={(e) => setRegister((v) => ({ ...v, confirmPassword: e.target.value }))} required />
                 </label>
               </div>
-            </>
-          )}
 
-          {error ? <div className="inline-alert error">{error}</div> : null}
+              {registerError ? <div className="inline-alert error auth-inline-alert">{registerError}</div> : null}
 
-          <button className="primary-btn" type="submit" disabled={pending}>
-            {pending ? 'Processando...' : mode === 'login' ? 'Entrar no portal' : 'Criar acesso'}
-          </button>
-
-          <div className="auth-footer-copy">
-            <p>RH + candidato + API pública falando a mesma linguagem, sem depender de proxy MVC.</p>
-            <Link to={withTenant('/', ctx.tenantId)}>Voltar para vagas abertas</Link>
+              <div className="auth-help-modal-footer auth-register-footer">
+                <button className="auth-secondary-btn auth-modal-cancel" type="button" onClick={() => setShowRegisterModal(false)}>
+                  {text.cancel}
+                </button>
+                <button className="auth-submit auth-modal-primary auth-submit-inline" type="submit" disabled={registerPending}>
+                  {registerPending ? text.processing : text.createAccess}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </section>
+        </div>
+      ) : null}
     </main>
   )
 }
@@ -746,6 +965,218 @@ function JobsPage({ ctx }: { ctx: AuthContext }) {
   )
 }
 
+type CandidateProfileModalProps = {
+  ctx: AuthContext
+  onClose: () => void
+}
+
+function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
+  const candidateId = ctx.session?.candidate.id ?? ''
+  const authFetch = useMemo(() => createAuthorizedClient(ctx), [ctx])
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [profile, setProfile] = useState<PortalProfile | null>(null)
+  const [completion, setCompletion] = useState<PortalCompletion | null>(null)
+  const [matchesCount, setMatchesCount] = useState(0)
+  const [documentsCount, setDocumentsCount] = useState(0)
+  const [referencesCount, setReferencesCount] = useState(0)
+  const [form, setForm] = useState({
+    nome: '',
+    email: '',
+    fone: '',
+    cidade: '',
+    uf: '',
+  })
+
+  useEffect(() => {
+    if (!candidateId) return
+    let cancelled = false
+
+    void (async () => {
+      setLoading(true)
+      setMessage(null)
+      try {
+        const [profileData, completionData, matchesData, documentsData, referencesData] = await Promise.all([
+          authFetch<PortalProfile>(`/api/public/portal-candidates/${candidateId}`),
+          authFetch<PortalCompletion>(`/api/public/portal-candidates/${candidateId}/profile-completion`),
+          authFetch<{ matches: PortalMatchItem[] }>(`/api/public/portal-candidates/${candidateId}/job-matches`),
+          authFetch<{ items: PortalDocument[] }>(`/api/public/portal-candidates/${candidateId}/documents`),
+          authFetch<{ items: PortalReference[] }>(`/api/public/portal-candidates/${candidateId}/references`),
+        ])
+
+        if (cancelled) return
+
+        setProfile(profileData)
+        setCompletion(completionData)
+        setMatchesCount(matchesData.matches?.length ?? 0)
+        setDocumentsCount(documentsData.items?.length ?? 0)
+        setReferencesCount(referencesData.items?.length ?? 0)
+        setForm({
+          nome: profileData.nome ?? '',
+          email: profileData.email ?? '',
+          fone: profileData.fone ?? '',
+          cidade: profileData.cidade ?? '',
+          uf: profileData.uf ?? '',
+        })
+      } catch (err) {
+        if (!cancelled) setMessage(readError(err))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [authFetch, candidateId])
+
+  async function handleSave(event: FormEvent) {
+    event.preventDefault()
+    setSaving(true)
+    setMessage(null)
+    try {
+      const result = await authFetch<PortalProfile>(`/api/public/portal-candidates/${candidateId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          nome: form.nome.trim(),
+          fone: form.fone.trim(),
+          cidade: form.cidade.trim(),
+          uf: form.uf.trim().toUpperCase(),
+          linkedinUrl: profile?.linkedinUrl ?? null,
+          resumoProfissional: profile?.resumoProfissional ?? null,
+        }),
+      })
+      setProfile(result)
+      setForm((current) => ({
+        ...current,
+        nome: result.nome ?? current.nome,
+        email: result.email ?? current.email,
+        fone: result.fone ?? '',
+        cidade: result.cidade ?? '',
+        uf: result.uf ?? '',
+      }))
+      setMessage('Perfil atualizado com sucesso.')
+    } catch (err) {
+      setMessage(readError(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const sectionTiles = [
+    { key: 'perfil', label: 'Perfil', icon: 'fa-user', value: completion?.sections?.perfil ?? completion?.overall ?? 0, kind: 'percent' as const },
+    { key: 'testes', label: 'Testes', icon: 'fa-clipboard-check', value: completion?.sections?.testes ?? 0, kind: 'percent' as const },
+    { key: 'comp', label: 'Competências & Portfólio', icon: 'fa-bolt', value: completion?.sections?.comp ?? 0, kind: 'percent' as const },
+    { key: 'formacao', label: 'Formação & Educação', icon: 'fa-graduation-cap', value: completion?.sections?.formacao ?? 0, kind: 'percent' as const },
+    { key: 'exp', label: 'Experiência & Projetos', icon: 'fa-briefcase', value: completion?.sections?.exp ?? 0, kind: 'percent' as const },
+    { key: 'lgpd', label: 'Privacidade (LGPD)', icon: 'fa-shield-alt', value: completion?.sections?.lgpd ?? 0, kind: 'percent' as const },
+    { key: 'pref', label: 'Preferências / Objetivos', icon: 'fa-bullseye', value: completion?.sections?.pref ?? 0, kind: 'percent' as const },
+    { key: 'docs', label: 'Documentos & Anexos', icon: 'fa-paperclip', value: documentsCount, kind: 'count' as const },
+    { key: 'refs', label: 'Referências', icon: 'fa-users', value: referencesCount, kind: 'count' as const },
+    { key: 'acess', label: 'Acessibilidade & Inclusão', icon: 'fa-universal-access', value: completion?.sections?.acess ?? 0, kind: 'percent' as const },
+    { key: 'agenda', label: 'Disponibilidade & Agenda', icon: 'fa-calendar-alt', value: completion?.sections?.agenda ?? 0, kind: 'percent' as const },
+    { key: 'hist', label: 'Histórico de Candidaturas', icon: 'fa-history', value: completion?.sections?.hist ?? 0, kind: 'percent' as const },
+    { key: 'notif', label: 'Notificações & Comunicação', icon: 'fa-bell', value: completion?.sections?.notif ?? 0, kind: 'percent' as const },
+    { key: 'matches', label: 'Vagas sugeridas', icon: 'fa-star', value: matchesCount, kind: 'count' as const },
+  ]
+
+  return (
+    <div className="modal-backdrop profile-modal-backdrop">
+      <div className="profile-modal-card" onClick={(event) => event.stopPropagation()}>
+        <form onSubmit={handleSave}>
+          <div className="profile-modal-header">
+            <div>
+              <h2 className="profile-modal-title">Meu perfil</h2>
+              <div className="profile-modal-subtitle">Atualize seus dados básicos e acompanhe o preenchimento das seções.</div>
+            </div>
+            <div className="profile-modal-header-actions">
+              <button className="profile-modal-action secondary" type="button" onClick={() => void openResumeHtml(authFetch, candidateId)}>
+                <i className="fas fa-eye" aria-hidden="true"></i>
+                <span>Visualizar curriculo</span>
+              </button>
+              <button className="profile-modal-action primary" type="button" onClick={() => void downloadResumePdf(authFetch, candidateId)}>
+                <i className="fas fa-file-pdf" aria-hidden="true"></i>
+                <span>Baixar curriculo</span>
+              </button>
+              <button type="button" className="profile-modal-close" onClick={onClose} aria-label="Fechar">
+                <i className="fas fa-times" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+
+          <div className="profile-modal-body">
+            {loading ? (
+              <PageLoading label="Sincronizando seu perfil e suas preferências..." />
+            ) : (
+              <div className="profile-modal-grid">
+                <section className="profile-left-panel">
+                  <div className="profile-panel-title">Dados do candidato</div>
+
+                  <label className="auth-field">
+                    <span>Nome completo</span>
+                    <input value={form.nome} onChange={(e) => setForm((current) => ({ ...current, nome: e.target.value }))} required />
+                  </label>
+
+                  <label className="auth-field">
+                    <span>E-mail</span>
+                    <input value={form.email} readOnly />
+                  </label>
+
+                  <div className="profile-modal-two-columns">
+                    <label className="auth-field">
+                      <span>Telefone</span>
+                      <input value={form.fone} onChange={(e) => setForm((current) => ({ ...current, fone: e.target.value }))} required />
+                    </label>
+                    <label className="auth-field">
+                      <span>UF</span>
+                      <input value={form.uf} onChange={(e) => setForm((current) => ({ ...current, uf: e.target.value }))} maxLength={2} required />
+                    </label>
+                  </div>
+
+                  <label className="auth-field">
+                    <span>Cidade</span>
+                    <input value={form.cidade} onChange={(e) => setForm((current) => ({ ...current, cidade: e.target.value }))} required />
+                  </label>
+
+                  <div className="profile-panel-note">
+                    <i className="fas fa-shield-alt" aria-hidden="true"></i>
+                    <span>Seus dados são tratados de acordo com a LGPD.</span>
+                  </div>
+                </section>
+
+                <section className="profile-right-panel">
+                  <div className="profile-sections-grid">
+                    {sectionTiles.map((tile) => (
+                      <article className="profile-section-tile" key={tile.key}>
+                        <div className="profile-section-badge">
+                          {tile.kind === 'percent' ? `${tile.value}%` : tile.value}
+                        </div>
+                        <div className="profile-section-icon">
+                          <i className={`fas ${tile.icon}`} aria-hidden="true"></i>
+                        </div>
+                        <div className="profile-section-label">{tile.label}</div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
+            {message ? <div className={`inline-alert ${message.includes('sucesso') ? 'success' : 'error'}`}>{message}</div> : null}
+          </div>
+
+          <div className="profile-modal-footer">
+            <button className="profile-modal-footer-btn secondary" type="button" onClick={onClose}>Cancelar</button>
+            <button className="profile-modal-footer-btn primary" type="submit" disabled={saving || loading}>
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
   const navigate = useNavigate()
   const candidateId = ctx.session?.candidate.id ?? ''
@@ -871,7 +1302,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
   }
 
   if (loading) {
-    return <PageLoading label="Sincronizando seu perfil e suas prefer?ncias..." />
+    return <PageLoading label="Sincronizando seu perfil e suas preferências..." />
   }
 
   if (message && !state.profile) {
@@ -990,7 +1421,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
             <div className="matches-grid">
               {state.matches.map((match) => (
                 <article key={match.vagaId} className="inline-card">
-                  <strong>{match.title || 'Vaga sem t?tulo'}</strong>
+                  <strong>{match.title || 'Vaga sem título'}</strong>
                   <p>{match.area || 'Área não informada'} • {match.city || 'Cidade'} {match.uf || ''}</p>
                   <span>Score {match.score}% • {match.mode || 'Formato flexível'}</span>
                   {match.reason ? <small>{match.reason}</small> : null}
@@ -1013,7 +1444,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 field('Drive', state.portfolio?.links.drive),
                 field('Tags', state.portfolio?.tags),
               ]}
-              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio`, values, 'Prefer?ncias e links salvos.')}
+              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio`, values, 'Preferências e links salvos.')}
             />
 
             <RepeaterSection
@@ -1025,27 +1456,27 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
               fields={[
                 { name: 'tipo', label: 'Tipo' },
                 { name: 'nome', label: 'Nome' },
-                { name: 'nivel', label: 'N?vel' },
-                { name: 'evidencia', label: 'Evid?ncia' },
+                { name: 'nivel', label: 'Nível' },
+                { name: 'evidencia', label: 'Evidência' },
               ]}
             />
 
             <RepeaterSection
-              title="Certifica??es"
+              title="Certificações"
               items={state.portfolio?.certifications ?? []}
-              describe={(item) => `${item.instituicao || 'Institui??o livre'} ${item.ano ? `? ${item.ano}` : ''}`}
-              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications`, values, 'Certifica??o adicionada.', 'POST')}
-              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications/${item.id}`, 'Certifica??o removida.')}
+              describe={(item) => `${item.instituicao || 'Instituição livre'} ${item.ano ? `• ${item.ano}` : ''}`}
+              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications`, values, 'Certificação adicionada.', 'POST')}
+              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications/${item.id}`, 'Certificação removida.')}
               fields={[
                 { name: 'nome', label: 'Nome' },
-                { name: 'instituicao', label: 'Institui??o' },
+                { name: 'instituicao', label: 'Instituição' },
                 { name: 'ano', label: 'Ano' },
                 { name: 'link', label: 'Link' },
               ]}
             />
           </WorkspaceSection>
 
-          <WorkspaceSection title="Educa??o" description="Resumo da forma??o e hist?rico acad?mico detalhado.">
+          <WorkspaceSection title="Educação" description="Resumo da formação e histórico acadêmico detalhado.">
             <RecordForm
               fields={[
                 field('nivel', state.education?.summary.nivel),
@@ -1056,19 +1487,19 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
               onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/education`, values, 'Resumo educacional salvo.')}
             />
             <RepeaterSection
-              title="Cursos e forma??es"
+              title="Cursos e formações"
               items={state.education?.items ?? []}
-              describe={(item) => `${item.instituicao || 'Institui??o livre'} ? ${item.status || 'Status aberto'}`}
-              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/education/items`, values, 'Forma??o adicionada.', 'POST')}
-              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/education/items/${item.id}`, 'Forma??o removida.')}
+              describe={(item) => `${item.instituicao || 'Instituição livre'} • ${item.status || 'Status aberto'}`}
+              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/education/items`, values, 'Formação adicionada.', 'POST')}
+              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/education/items/${item.id}`, 'Formação removida.')}
               fields={[
                 { name: 'curso', label: 'Curso' },
-                { name: 'instituicao', label: 'Institui??o' },
+                { name: 'instituicao', label: 'Instituição' },
                 { name: 'tipo', label: 'Tipo' },
                 { name: 'status', label: 'Status' },
-                { name: 'inicio', label: 'In?cio' },
+                { name: 'inicio', label: 'Início' },
                 { name: 'fim', label: 'Fim' },
-                { name: 'observacoes', label: 'Observa??es' },
+                { name: 'observacoes', label: 'Observações' },
                 { name: 'link', label: 'Link' },
               ]}
             />
@@ -1086,7 +1517,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
               fields={[
                 { name: 'empresa', label: 'Empresa' },
                 { name: 'cargo', label: 'Cargo' },
-                { name: 'inicio', label: 'In?cio' },
+                { name: 'inicio', label: 'Início' },
                 { name: 'fim', label: 'Fim' },
                 { name: 'local', label: 'Local / modelo' },
                 { name: 'atividades', label: 'Atividades' },
@@ -1095,13 +1526,13 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
             <RepeaterSection
               title="Projetos"
               items={state.experience?.projects ?? []}
-              describe={(item) => `${item.periodo || 'Per?odo livre'} ? ${item.stack || 'Stack aberta'}`}
+              describe={(item) => `${item.periodo || 'Período livre'} • ${item.stack || 'Stack aberta'}`}
               onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/projects`, values, 'Projeto adicionado.', 'POST')}
               onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/projects/${item.id}`, 'Projeto removido.')}
               fields={[
                 { name: 'nome', label: 'Nome' },
-                { name: 'periodo', label: 'Per?odo' },
-                { name: 'descricao', label: 'Descri??o' },
+                { name: 'periodo', label: 'Período' },
+                { name: 'descricao', label: 'Descrição' },
                 { name: 'link', label: 'Link' },
                 { name: 'stack', label: 'Stack' },
                 { name: 'destaques', label: 'Destaques' },
@@ -1109,7 +1540,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
             />
           </WorkspaceSection>
 
-          <WorkspaceSection title="Prefer?ncias de vaga" description="Objetivo profissional, deslocamento, jornada e remunera??o.">
+          <WorkspaceSection title="Preferências de vaga" description="Objetivo profissional, deslocamento, jornada e remuneração.">
             <RecordForm
               fields={[
                 field('CargoAlvo', asString(state.preferences?.CargoAlvo)),
@@ -1130,7 +1561,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 field('BeneficiosDesejados', asString(state.preferences?.BeneficiosDesejados)),
                 field('NaoAbreMaoDe', asString(state.preferences?.NaoAbreMaoDe)),
               ]}
-              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/preferences`, values, 'Prefer?ncias salvas.')}
+              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/preferences`, values, 'Preferências salvas.')}
             />
           </WorkspaceSection>
 
@@ -1156,7 +1587,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 check('periodoTarde', state.agenda?.preferences.periodoTarde),
                 check('periodoNoite', state.agenda?.preferences.periodoNoite),
               ]}
-              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/agenda`, values, 'Prefer?ncias de agenda salvas.')}
+              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/agenda`, values, 'Preferências de agenda salvas.')}
             />
             <RepeaterSection
               title="Bloqueios"
@@ -1166,15 +1597,15 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
               onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/agenda/blocks/${item.id}`, 'Bloqueio removido.')}
               fields={[
                 { name: 'tipo', label: 'Tipo' },
-                { name: 'titulo', label: 'T?tulo' },
+                { name: 'titulo', label: 'Título' },
                 { name: 'data', label: 'Data' },
-                { name: 'horario', label: 'Hor?rio' },
-                { name: 'observacoes', label: 'Observa??es' },
+                { name: 'horario', label: 'Horário' },
+                { name: 'observacoes', label: 'Observações' },
               ]}
             />
           </WorkspaceSection>
 
-          <WorkspaceSection title="Notifica??es e LGPD" description="Consentimentos, canais e prioridades de contato.">
+          <WorkspaceSection title="Notificações e LGPD" description="Consentimentos, canais e prioridades de contato.">
             <RecordForm
               fields={[
                 field('frequencia', state.notifications?.frequencia),
@@ -1200,7 +1631,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 check('alertaDocumentos', state.notifications?.alertaDocumentos),
                 check('alertaLembretes', state.notifications?.alertaLembretes),
               ]}
-              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/notifications`, values, 'Notifica??es atualizadas.')}
+              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/notifications`, values, 'Notificações atualizadas.')}
             />
 
             <RecordForm
@@ -1218,12 +1649,12 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
               onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/lgpd`, {
                 ...values,
                 retencaoMeses: values.retencaoMeses ? Number(values.retencaoMeses) : null,
-              }, 'Prefer?ncias LGPD atualizadas.')}
+              }, 'Preferências LGPD atualizadas.')}
             />
             <button className="secondary-btn" type="button" onClick={() => void openLgpdReceipt(authFetch, candidateId)}>Abrir comprovante LGPD</button>
           </WorkspaceSection>
 
-          <WorkspaceSection title="Documentos, refer?ncias e acessibilidade" description="Toda a camada complementar do perfil do candidato.">
+          <WorkspaceSection title="Documentos, referências e acessibilidade" description="Toda a camada complementar do perfil do candidato.">
             <RepeaterSection
               title="Documentos"
               items={state.documents}
@@ -1235,29 +1666,29 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 { name: 'nome', label: 'Nome' },
                 { name: 'link', label: 'Link' },
                 { name: 'data', label: 'Data' },
-                { name: 'observacoes', label: 'Observa??es' },
+                { name: 'observacoes', label: 'Observações' },
                 { name: 'fileName', label: 'Nome do arquivo' },
               ]}
             />
 
             <RepeaterSection
-              title="Refer?ncias"
+              title="Referências"
               items={state.references}
-              describe={(item) => `${item.relacao || 'Rela??o livre'} ? ${item.contato || 'Contato n?o informado'}`}
+              describe={(item) => `${item.relacao || 'Relação livre'} • ${item.contato || 'Contato não informado'}`}
               onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/references`, {
                 ...values,
                 podeContatar: Boolean(values.podeContatar),
-              }, 'Refer?ncia salva.', 'POST')}
-              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/references/${item.id}`, 'Refer?ncia removida.')}
+              }, 'Referência salva.', 'POST')}
+              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/references/${item.id}`, 'Referência removida.')}
               fields={[
                 { name: 'nome', label: 'Nome' },
-                { name: 'relacao', label: 'Rela??o' },
+                { name: 'relacao', label: 'Relação' },
                 { name: 'empresa', label: 'Empresa' },
                 { name: 'cargo', label: 'Cargo' },
                 { name: 'contato', label: 'Contato' },
-                { name: 'periodo', label: 'Per?odo' },
+                { name: 'periodo', label: 'Período' },
                 { name: 'linkedin', label: 'LinkedIn' },
-                { name: 'observacoes', label: 'Observa??es' },
+                { name: 'observacoes', label: 'Observações' },
                 { name: 'podeContatar', label: 'Pode contatar? (true/false)' },
               ]}
             />
@@ -1301,7 +1732,7 @@ type AuthContext = {
 
 function createAuthorizedClient(ctx: AuthContext) {
   return async function request<T>(path: string, init?: RequestInit, json = true): Promise<T> {
-    if (!ctx.session) throw new Error('Sess?o n?o encontrada.')
+    if (!ctx.session) throw new Error('Sessão não encontrada.')
 
     const ensured = await ensureSession(ctx.session, ctx.tenantId)
     ctx.setSession(ensured)
@@ -1318,7 +1749,7 @@ function createAuthorizedClient(ctx: AuthContext) {
 
     if (!response.ok) {
       if (response.status === 401) {
-        ctx.notifyAuthError('Sua sess?o expirou. Entre novamente.')
+        ctx.notifyAuthError('Sua sessão expirou. Entre novamente.')
         ctx.setSession(null)
       }
       throw new Error(await readApiMessage(response))
@@ -1330,7 +1761,7 @@ function createAuthorizedClient(ctx: AuthContext) {
 }
 
 async function fetchAuthorizedBlobUrl(ctx: AuthContext, path: string) {
-  if (!ctx.session) throw new Error('Sess?o n?o encontrada.')
+  if (!ctx.session) throw new Error('Sessão não encontrada.')
   const ensured = await ensureSession(ctx.session, ctx.tenantId)
   ctx.setSession(ensured)
 
@@ -1554,9 +1985,9 @@ const JOB_HERO_GRADIENTS = [
 ]
 
 const JOB_SECTION_IMAGES = [
-  { match: 'industrial', title: 'Operacoes Industriais', image: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&q=80&w=1600' },
+  { match: 'industrial', title: 'Operações Industriais', image: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&q=80&w=1600' },
   { match: 'qualidade', title: 'Qualidade & P&D', image: 'https://images.unsplash.com/photo-1582719471384-894fbb16e074?auto=format&fit=crop&q=80&w=1600' },
-  { match: 'logistica', title: 'Logistica & Supply', image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1600' },
+  { match: 'logistica', title: 'Logística & Supply', image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1600' },
   { match: 'rh', title: 'Administrativo & RH', image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1600' },
   { match: 'administrativo', title: 'Administrativo & RH', image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1600' },
   { match: 'comercial', title: 'Vendas & Marketing', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1600' },
@@ -1591,7 +2022,7 @@ function formatJobLocation(job: PortalJob) {
   if (city && uf) return `${city}, ${uf}`
   if (city) return city
   if (uf) return uf
-  return job.modalidade || 'Nao informado'
+  return job.modalidade || 'Não informado'
 }
 
 function normalizeAreaKey(value: string | null | undefined) {
