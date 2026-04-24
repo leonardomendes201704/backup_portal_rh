@@ -24,6 +24,27 @@ public sealed class PortalAuthApiClient
         return await SendAsync("api/public/portal-auth/register", tenantId, request, ct);
     }
 
+    public async Task<PortalAuthResult> RefreshAsync(string tenantId, PortalCandidateRefreshRequest request, CancellationToken ct)
+    {
+        return await SendAsync("api/public/portal-auth/refresh", tenantId, request, ct);
+    }
+
+    public async Task LogoutAsync(string tenantId, PortalCandidateLogoutRequest request, string accessToken, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(accessToken))
+            return;
+
+        var url = $"api/public/portal-auth/logout?tenantId={Uri.EscapeDataString(tenantId)}";
+        using var req = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(request)
+        };
+        req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenantId);
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var _ = await _http.SendAsync(req, ct);
+    }
+
     private async Task<PortalAuthResult> SendAsync(string path, string tenantId, object payload, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(tenantId))
@@ -41,7 +62,7 @@ public sealed class PortalAuthApiClient
         using var res = await _http.SendAsync(req, ct);
         if (res.IsSuccessStatusCode)
         {
-            var data = await res.Content.ReadFromJsonAsync<PortalCandidateAuthResponse>(cancellationToken: ct);
+            var data = await res.Content.ReadFromJsonAsync<PortalCandidateSessionResponse>(cancellationToken: ct);
             if (data is not null)
                 return PortalAuthResult.Ok(data);
 

@@ -37,6 +37,9 @@ services:
       Cors__WebOrigin: http://localhost:8080
       Cors__AllowedOrigins__0: http://localhost:8080
       Cors__AllowedOrigins__1: http://localhost:8081
+      Cors__AllowedOrigins__2: http://localhost:8082
+      Cors__AllowedOrigins__3: http://localhost:7093
+      Cors__AllowedOrigins__4: http://localhost:5173
     ports:
       - "7073:8080"
 
@@ -70,6 +73,19 @@ services:
       Endpoints__RhApiPublic: http://localhost:7073/
     ports:
       - "8081:8080"
+
+  portal-react:
+    build:
+      context: ./LioTecnica.PortalVagas.React
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:7073
+        VITE_DEFAULT_TENANT: liotecnica
+    container_name: liotecnica-portal-vagas-react
+    depends_on:
+      - api
+    ports:
+      - "8082:8080"
 
   dozzle:
     image: amir20/dozzle:latest

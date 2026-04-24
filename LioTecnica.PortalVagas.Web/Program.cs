@@ -72,7 +72,7 @@ builder.Services.AddHttpClient<PortalAuthApiClient>(http =>
 builder.Services.AddHttpClient<PortalCandidatesApiClient>(http =>
 {
     http.BaseAddress = new Uri(builder.Configuration["Endpoints:RhApi"]!);
-});
+}).AddHttpMessageHandler<ApiAuthenticationHandler>();
 
 builder.Services.AddHttpClient<PortalLocationApiClient>(http =>
 {

@@ -1,10 +1,11 @@
 # Deploy Ubuntu com Docker Compose
 
-Este guia publica a stack completa em Ubuntu com 3 aplicações:
+Este guia publica a stack completa em Ubuntu com 4 aplicações:
 
 - `RHPortal.Api`
 - `LioTecnica.Web` (portal admin)
 - `LioTecnica.PortalVagas.Web` (portal de vagas)
+- `LioTecnica.PortalVagas.React` (portal de vagas SPA)
 
 Mais:
 
@@ -51,6 +52,19 @@ Responsabilidade:
 - acesso do candidato
 - listagem e candidatura em vagas
 - consumo da API
+
+### Portal de Vagas React
+
+Serviço:
+
+- `portal-react`
+
+Responsabilidade:
+
+- SPA paralela do candidato
+- autenticação com bearer token e refresh token
+- consumo direto da API pública
+- coexistência com o portal MVC durante a migração
 
 ### Banco
 
@@ -111,6 +125,9 @@ Preencha pelo menos:
 - `PORTAL_PUBLIC_ORIGIN`
 - `PORTAL_PUBLIC_PORT`
 - `PORTAL_PUBLIC_URL`
+- `PORTAL_REACT_PUBLIC_ORIGIN`
+- `PORTAL_REACT_PUBLIC_PORT`
+- `PORTAL_REACT_PUBLIC_URL`
 - `API_PUBLIC_URL`
 - `API_PUBLIC_PORT`
 - `SEED_ADMIN_PASSWORD`
@@ -134,6 +151,7 @@ docker compose --env-file .env.server -f docker-compose.server.yml ps
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal-react
 ```
 
 ## 6. Seed inicial
@@ -160,6 +178,7 @@ Exemplo de mapeamento:
 
 - Admin: `http://SEU_HOST:8081`
 - Portal de vagas: `http://SEU_HOST:8082/acesso?tenantId=liotecnica`
+- Portal de vagas React: `http://SEU_HOST:8083/acesso?tenantId=liotecnica`
 - API/Swagger: `http://SEU_HOST:7073/swagger`
 
 Observação:
@@ -195,6 +214,7 @@ docker compose --env-file .env.server -f docker-compose.server.yml up -d --build
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f api
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f web
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f portal-react
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f db
 ```
 
@@ -218,6 +238,8 @@ Em produção/servidor, pense sempre assim:
 1. `db` guarda os dados
 2. `api` concentra banco, regras, migration e seed
 3. `web` é o portal administrativo
+4. `portal` é o portal MVC legado do candidato
+5. `portal-react` é a SPA nova do candidato
 4. `portal` é o portal público do candidato
 
 Os dois fronts dependem da API; a API depende do PostgreSQL.

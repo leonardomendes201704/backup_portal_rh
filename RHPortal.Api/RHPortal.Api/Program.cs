@@ -119,7 +119,10 @@ builder.Services.AddCors(options =>
             "https://localhost:7091",
             "http://localhost:5051",
             "https://localhost:7092",
-            "http://localhost:5052"
+            "http://localhost:5052",
+            "https://localhost:7093",
+            "http://localhost:5173",
+            "http://localhost:4173"
         ])
         .Where(origin => !string.IsNullOrWhiteSpace(origin))
         .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -174,6 +177,7 @@ builder.Services.AddSingleton<ResetState>();
 builder.Services.AddScoped<NotificationPublisher>();
 builder.Services.AddSingleton<CandidateResumePdfBuilder>();
 builder.Services.AddSingleton<CandidateResumeHtmlBuilder>();
+builder.Services.AddSingleton(TimeProvider.System);
 
 // Email messaging (queue + SMTP/IMAP)
 builder.Services.AddSingleton<ISecretProtector, AesSecretProtector>();
@@ -276,10 +280,16 @@ builder.Services.AddAuthorization(options =>
         .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
         .RequireAuthenticatedUser()
         .Build();
+
+    options.AddPolicy(PortalCandidateClaimConstants.PolicyName, policy =>
+        policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .RequireClaim(PortalCandidateClaimConstants.Scope, PortalCandidateClaimConstants.ScopeValue));
 });
 
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddScoped<PortalCandidateRouteAccessFilter>();
 
 // Application services
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();

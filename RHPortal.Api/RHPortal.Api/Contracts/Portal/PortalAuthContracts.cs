@@ -26,3 +26,27 @@ public sealed record PortalCandidateAuthResponse(
     string Nome,
     string Email
 );
+
+public sealed record PortalCandidateIdentityResponse(
+    Guid Id,
+    string Nome,
+    string Email,
+    string TenantId
+);
+
+public sealed record PortalCandidateSessionResponse(
+    string AccessToken,
+    DateTimeOffset AccessTokenExpiresAtUtc,
+    int AccessTokenExpiresInSeconds,
+    string RefreshToken,
+    DateTimeOffset RefreshTokenExpiresAtUtc,
+    PortalCandidateIdentityResponse Candidate
+);
+
+public sealed record PortalCandidateRefreshRequest(
+    [Required, MinLength(32), MaxLength(256)] string RefreshToken
+);
+
+public sealed record PortalCandidateLogoutRequest(
+    [MaxLength(256)] string? RefreshToken
+);

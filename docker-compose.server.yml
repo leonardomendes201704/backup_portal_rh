@@ -37,6 +37,7 @@ services:
       Cors__WebOrigin: ${WEB_PUBLIC_ORIGIN}
       Cors__AllowedOrigins__0: ${WEB_PUBLIC_ORIGIN}
       Cors__AllowedOrigins__1: ${PORTAL_PUBLIC_ORIGIN}
+      Cors__AllowedOrigins__2: ${PORTAL_REACT_PUBLIC_ORIGIN}
       InboxFolder__RootPath: /app/App_Data/Inbox
       TransportSecurity__UseHttpsRedirection: ${API_USE_HTTPS_REDIRECTION:-false}
       Seed__Enabled: ${SEED_ENABLED:-true}
@@ -120,6 +121,27 @@ services:
       - "${PORTAL_PUBLIC_PORT:-8081}:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/acesso?tenantId=liotecnica > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  portal-react:
+    build:
+      context: ./LioTecnica.PortalVagas.React
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${API_PUBLIC_URL}
+        VITE_DEFAULT_TENANT: ${PORTAL_REACT_DEFAULT_TENANT:-liotecnica}
+    container_name: liotecnica-portal-vagas-react
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${PORTAL_REACT_PUBLIC_PORT:-8083}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/acesso?tenantId=${PORTAL_REACT_DEFAULT_TENANT:-liotecnica} > /dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10

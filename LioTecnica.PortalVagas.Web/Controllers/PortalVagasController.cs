@@ -143,6 +143,26 @@ public sealed class PortalVagasController : Controller
         var resolvedTenantId = ResolveTenantId(tenantId, null)
             ?? User?.FindFirst("tenant")?.Value?.Trim();
 
+        var refreshToken = User?.FindFirst("refresh_token")?.Value;
+        var accessToken = User?.FindFirst("access_token")?.Value;
+        if (!string.IsNullOrWhiteSpace(resolvedTenantId)
+            && !string.IsNullOrWhiteSpace(refreshToken)
+            && !string.IsNullOrWhiteSpace(accessToken))
+        {
+            try
+            {
+                await _portalAuthApi.LogoutAsync(
+                    resolvedTenantId,
+                    new PortalCandidateLogoutRequest(refreshToken),
+                    accessToken,
+                    HttpContext.RequestAborted);
+            }
+            catch
+            {
+                // best-effort only
+            }
+        }
+
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignOutAsync(CandidateAuthDefaults.Scheme);
 
@@ -1050,7 +1070,7 @@ public sealed class PortalVagasController : Controller
         await SignInCandidateAsync(result.Data, tenantId);
 
         var redirect = BuildRedirectUrl(input.ReturnUrl, tenantId);
-        return Ok(new PortalCandidateAuthUiResponse(redirect, result.Data.Nome, result.Data.Email));
+        return Ok(new PortalCandidateAuthUiResponse(redirect, result.Data.Candidate.Nome, result.Data.Candidate.Email));
     }
 
     [AllowAnonymous]
@@ -1086,17 +1106,21 @@ public sealed class PortalVagasController : Controller
         await SignInCandidateAsync(result.Data, tenantId);
 
         var redirect = BuildRedirectUrl(input.ReturnUrl, tenantId);
-        return Ok(new PortalCandidateAuthUiResponse(redirect, result.Data.Nome, result.Data.Email));
+        return Ok(new PortalCandidateAuthUiResponse(redirect, result.Data.Candidate.Nome, result.Data.Candidate.Email));
     }
 
-    private async Task SignInCandidateAsync(PortalCandidateAuthResponse data, string tenantId)
+    private async Task SignInCandidateAsync(PortalCandidateSessionResponse data, string tenantId)
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, data.Id.ToString()),
-            new(ClaimTypes.Email, data.Email),
-            new(ClaimTypes.Name, data.Nome),
-            new("tenant", tenantId)
+            new(ClaimTypes.NameIdentifier, data.Candidate.Id.ToString()),
+            new(ClaimTypes.Email, data.Candidate.Email),
+            new(ClaimTypes.Name, data.Candidate.Nome),
+            new("tenant", tenantId),
+            new("access_token", data.AccessToken),
+            new("refresh_token", data.RefreshToken),
+            new("access_token_expires_at", data.AccessTokenExpiresAtUtc.ToString("O")),
+            new("refresh_token_expires_at", data.RefreshTokenExpiresAtUtc.ToString("O"))
         };
 
         var identity = new ClaimsIdentity(claims, CandidateAuthDefaults.Scheme);

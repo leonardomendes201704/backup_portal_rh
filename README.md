@@ -1,10 +1,11 @@
 # Portal RH
 
-Portal RH is a recruiting and hiring platform composed of 3 main applications plus PostgreSQL:
+Portal RH is a recruiting and hiring platform composed of 4 applications plus PostgreSQL:
 
 - `RHPortal.Api`: ASP.NET Core API responsible for authentication, business rules, database access, migrations, seed, health checks, auditing, and integrations.
 - `LioTecnica.Web`: ASP.NET Core MVC admin portal used by internal/admin users.
 - `LioTecnica.PortalVagas.Web`: ASP.NET Core MVC candidate portal used by applicants and public job flows.
+- `LioTecnica.PortalVagas.React`: React + TypeScript + Vite SPA candidate portal that talks directly to the public API.
 
 ## Architecture
 
@@ -53,6 +54,19 @@ Path:
 
 - `LioTecnica.PortalVagas.Web`
 
+### 4. `LioTecnica.PortalVagas.React`
+
+Responsibilities:
+
+- token-based candidate authentication for SPA flows
+- direct browser-to-API calls
+- React workspace for jobs, profile, resume, matching, agenda, documents, LGPD, notifications, references, accessibility, skills, education and experience
+- coexistence in parallel with the MVC portal during migration
+
+Path:
+
+- `LioTecnica.PortalVagas.React`
+
 ## Tech stack
 
 - .NET 9
@@ -84,7 +98,8 @@ Path:
 - only `RHPortal.Api` talks directly to PostgreSQL
 - `LioTecnica.Web` depends on the API
 - `LioTecnica.PortalVagas.Web` depends on the API
-- the 2 front-ends do not use database credentials directly
+- `LioTecnica.PortalVagas.React` depends on the API
+- the 3 front-ends do not use database credentials directly
 
 ## Local setup
 
@@ -142,6 +157,18 @@ dotnet run
 Expected URL:
 
 - `https://localhost:7092/acesso?tenantId=liotecnica`
+
+### Run the candidate portal (React SPA)
+
+```powershell
+cd LioTecnica.PortalVagas.React
+npm install
+npm run dev
+```
+
+Expected URL:
+
+- `http://localhost:7093/acesso?tenantId=liotecnica`
 
 ## First run on a new machine
 
@@ -538,6 +565,13 @@ Os dois fronts dependem da saúde da API.
 - espera alguns segundos entre tentativas
 - só mostra uma indisponibilidade amigável depois das tentativas falharem
 
+### Portal de Vagas React
+
+- autentica direto na API por bearer token
+- renova sessão via refresh token
+- expõe o workspace completo do candidato em SPA
+- pode conviver com o portal MVC sem cortar o fluxo atual
+
 ## Docker
 
 O repositório inclui:
@@ -551,6 +585,7 @@ A stack local inclui:
 - API
 - portal admin
 - portal de vagas
+- portal de vagas React
 - Dozzle
 
 Subida local:
@@ -563,6 +598,7 @@ Portas padrão locais:
 
 - admin: `http://localhost:8080`
 - portal de vagas: `http://localhost:8081/acesso?tenantId=liotecnica`
+- portal de vagas React: `http://localhost:8082/acesso?tenantId=liotecnica`
 - api: `http://localhost:7073`
 - dozzle: `http://localhost:9999`
 
@@ -589,6 +625,7 @@ Mapeamento público típico:
 
 - admin: `http://HOST:8081`
 - portal: `http://HOST:8082/acesso?tenantId=liotecnica`
+- portal-react: `http://HOST:8083/acesso?tenantId=liotecnica`
 - api: `http://HOST:7073/swagger`
 
 Observação:
@@ -620,6 +657,13 @@ Observação:
 - `Endpoints:RhApi`
 - `Endpoints:RhApiPublic`
 - `TransportSecurity:*`
+
+### Portal de Vagas React
+
+- `VITE_API_BASE_URL`
+- `VITE_DEFAULT_TENANT`
+- `PORTAL_REACT_PUBLIC_ORIGIN`
+- `PORTAL_REACT_PUBLIC_PORT`
 
 ## OpenAI
 

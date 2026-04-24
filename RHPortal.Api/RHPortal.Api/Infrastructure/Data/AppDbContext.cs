@@ -58,6 +58,7 @@ public sealed class AppDbContext : IdentityDbContext<ApplicationUser, Applicatio
     public DbSet<CandidatoAgendaBloqueio> CandidatoAgendaBloqueios => Set<CandidatoAgendaBloqueio>();
     public DbSet<CandidatoNotificacaoPreferencia> CandidatoNotificacaoPreferencias => Set<CandidatoNotificacaoPreferencia>();
     public DbSet<CandidatoLgpdConsent> CandidatoLgpdConsents => Set<CandidatoLgpdConsent>();
+    public DbSet<PortalCandidateSession> PortalCandidateSessions => Set<PortalCandidateSession>();
     public DbSet<CandidatoStatusHistory> CandidatoStatusHistories => Set<CandidatoStatusHistory>();
     public DbSet<EmailConfig> EmailConfigs => Set<EmailConfig>();
     public DbSet<EntraIdConfig> EntraIdConfigs => Set<EntraIdConfig>();
@@ -477,6 +478,25 @@ public sealed class AppDbContext : IdentityDbContext<ApplicationUser, Applicatio
                 .HasForeignKey(x => x.CandidatoId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            b.HasQueryFilter(x => x.TenantId == _tenantContext.TenantId);
+        });
+
+        modelBuilder.Entity<PortalCandidateSession>(b =>
+        {
+            b.ToTable("PortalCandidateSessions");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.TenantId).HasMaxLength(64).IsRequired();
+            b.Property(x => x.RefreshTokenHash).HasMaxLength(128).IsRequired();
+            b.Property(x => x.UserAgent).HasMaxLength(256);
+
+            b.HasOne(x => x.Candidato)
+                .WithMany()
+                .HasForeignKey(x => x.CandidatoId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(x => new { x.TenantId, x.CandidatoId });
+            b.HasIndex(x => new { x.TenantId, x.RefreshTokenHash }).IsUnique();
             b.HasQueryFilter(x => x.TenantId == _tenantContext.TenantId);
         });
 
@@ -1404,6 +1424,12 @@ public sealed class AppDbContext : IdentityDbContext<ApplicationUser, Applicatio
             {
                 if (entry.State == EntityState.Added) c.CreatedAtUtc = now;
                 if (entry.State is EntityState.Added or EntityState.Modified) c.UpdatedAtUtc = now;
+            }
+
+            if (entry.Entity is PortalCandidateSession portalSession)
+            {
+                if (entry.State == EntityState.Added) portalSession.CreatedAtUtc = now;
+                if (entry.State is EntityState.Added or EntityState.Modified) portalSession.UpdatedAtUtc = now;
             }
 
             if (entry.Entity is CandidatoDocumento cd)

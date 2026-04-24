@@ -1,10 +1,11 @@
 # Setup local
 
-Este projeto possui 3 aplicações principais:
+Este projeto possui 4 aplicações principais:
 
 - `RHPortal.Api`: API ASP.NET Core + Entity Framework Core + PostgreSQL
 - `LioTecnica.Web`: portal administrativo
 - `LioTecnica.PortalVagas.Web`: portal de vagas/candidato
+- `LioTecnica.PortalVagas.React`: portal de vagas em React + TypeScript + Vite
 
 O banco é usado apenas pela API. Os dois fronts consomem a API por HTTP/HTTPS.
 
@@ -64,6 +65,22 @@ Projeto:
 URL padrão local:
 
 - `https://localhost:7092/acesso?tenantId=liotecnica`
+
+### 4. Portal de Vagas React
+
+Responsabilidade:
+
+- SPA do candidato consumindo a API pública diretamente
+- autenticação por token (`login`, `register`, `refresh`, `me`, `logout`)
+- home pública de vagas + workspace autenticado do candidato
+
+Projeto:
+
+- `LioTecnica.PortalVagas.React`
+
+URL padrão local:
+
+- `http://localhost:7093/acesso?tenantId=liotecnica`
 
 ## Pré-requisitos
 
@@ -179,6 +196,19 @@ Resultado esperado:
 
 - portal público em `https://localhost:7092/acesso?tenantId=liotecnica`
 - consumindo a API local
+
+### Portal de Vagas React
+
+```powershell
+cd LioTecnica.PortalVagas.React
+npm install
+npm run dev
+```
+
+Resultado esperado:
+
+- SPA pública em `http://localhost:7093/acesso?tenantId=liotecnica`
+- consumindo a API local diretamente via bearer token
 
 ## Multiple startup no Visual Studio
 

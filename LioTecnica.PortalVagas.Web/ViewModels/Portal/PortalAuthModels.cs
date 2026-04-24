@@ -73,6 +73,30 @@ public sealed record PortalCandidateAuthResponse(
     string Email
 );
 
+public sealed record PortalCandidateIdentityResponse(
+    Guid Id,
+    string Nome,
+    string Email,
+    string TenantId
+);
+
+public sealed record PortalCandidateSessionResponse(
+    string AccessToken,
+    DateTimeOffset AccessTokenExpiresAtUtc,
+    int AccessTokenExpiresInSeconds,
+    string RefreshToken,
+    DateTimeOffset RefreshTokenExpiresAtUtc,
+    PortalCandidateIdentityResponse Candidate
+);
+
+public sealed record PortalCandidateRefreshRequest(
+    [Required, MinLength(32), MaxLength(256)] string RefreshToken
+);
+
+public sealed record PortalCandidateLogoutRequest(
+    [MaxLength(256)] string? RefreshToken
+);
+
 public sealed record PortalCandidateAuthUiResponse(
     string RedirectUrl,
     string Nome,
@@ -354,7 +378,7 @@ public sealed class PortalApiResult<T>
 
 public sealed class PortalAuthResult
 {
-    private PortalAuthResult(bool success, HttpStatusCode statusCode, PortalCandidateAuthResponse? data, string? message)
+    private PortalAuthResult(bool success, HttpStatusCode statusCode, PortalCandidateSessionResponse? data, string? message)
     {
         Success = success;
         StatusCode = statusCode;
@@ -364,10 +388,10 @@ public sealed class PortalAuthResult
 
     public bool Success { get; }
     public HttpStatusCode StatusCode { get; }
-    public PortalCandidateAuthResponse? Data { get; }
+    public PortalCandidateSessionResponse? Data { get; }
     public string? Message { get; }
 
-    public static PortalAuthResult Ok(PortalCandidateAuthResponse data)
+    public static PortalAuthResult Ok(PortalCandidateSessionResponse data)
         => new(true, HttpStatusCode.OK, data, null);
 
     public static PortalAuthResult Fail(HttpStatusCode statusCode, string? message)

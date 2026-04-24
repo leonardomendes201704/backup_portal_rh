@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,8 +22,8 @@ using RhPortal.Api.Infrastructure.Localization;
 using RhPortal.Api.Infrastructure.Notifications;
 using RhPortal.Api.Infrastructure.Pdf;
 using RhPortal.Api.Infrastructure.Html;
+using RhPortal.Api.Infrastructure.Security;
 using RhPortal.Api.Infrastructure.Tenancy;
-using RhPortal.Api.Application.Portal;
 
 namespace RhPortal.Api.Controllers;
 
@@ -30,7 +31,8 @@ namespace RhPortal.Api.Controllers;
 /// Perfil do candidato no Portal de Vagas (dados pessoais e secoes do perfil).
 /// </summary>
 [ApiController]
-[AllowAnonymous]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = PortalCandidateClaimConstants.PolicyName)]
+[ServiceFilter(typeof(PortalCandidateRouteAccessFilter))]
 [Route("api/public/portal-candidates")]
 public sealed class PortalCandidatesController : ControllerBase
 {
