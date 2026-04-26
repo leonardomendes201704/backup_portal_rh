@@ -18,6 +18,15 @@ type AuthSession = {
   candidate: AuthCandidate
 }
 
+type LegacyAuthResponse = {
+  id: string
+  nome: string
+  email: string
+  tenantId?: string
+}
+
+type AuthResponse = AuthSession | LegacyAuthResponse
+
 type PortalProfile = {
   id: string
   nome: string
@@ -287,14 +296,14 @@ function PortalApp() {
     return (params.get(TENANT_QUERY_KEY) ?? DEFAULT_TENANT).trim().toLowerCase()
   }, [location.search])
   const storageKey = `portal-vagas-react-session:${tenantId}`
-  const [session, setSession] = useState<AuthSession | null>(() => loadStoredSession(storageKey))
+  const [session, setSession] = useState<AuthSession | null>(() => loadStoredSession(storageKey, tenantId))
   const [initializing, setInitializing] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   useEffect(() => {
-    setSession(loadStoredSession(storageKey))
-  }, [storageKey])
+    setSession(loadStoredSession(storageKey, tenantId))
+  }, [storageKey, tenantId])
   useEffect(() => {
     if (!session) {
       setInitializing(false)
@@ -340,10 +349,10 @@ function PortalApp() {
   useEffect(() => {
     setUserMenuOpen(false)
   }, [location.pathname, location.search])
-  const initials = session ? getInitials(session.candidate.nome) : 'LT'
+  const initials = session ?getInitials(session.candidate.nome) : 'LT'
   return (
-    <div className={`portal-root${isAccessRoute ? ' access-route' : ''}`}>
-      {!isAccessRoute ? (
+    <div className={`portal-root${isAccessRoute ?' access-route' : ''}`}>
+      {!isAccessRoute ?(
         <div className="header-wrapper">
           <nav className="portal-navbar">
             <div className="portal-container portal-nav-inner">
@@ -352,7 +361,7 @@ function PortalApp() {
                 <span>LT Portal de Vagas</span>
               </Link>
               <div className="portal-actions">
-                {session ? (
+                {session ?(
                   <div className="portal-user-menu">
                     <Link className="portal-action-link" to={withTenant('/candidato', tenantId)}>Meu espaço</Link>
                     <button
@@ -369,7 +378,7 @@ function PortalApp() {
                       </span>
                       <i className="fas fa-chevron-down portal-user-chevron" aria-hidden="true"></i>
                     </button>
-                    {userMenuOpen ? (
+                    {userMenuOpen ?(
                       <div className="portal-user-dropdown" role="menu">
                         <button
                           className="portal-user-dropdown-item"
@@ -405,16 +414,16 @@ function PortalApp() {
           </nav>
         </div>
       ) : null}
-      {authError ? <div className="toast-banner error">{authError}</div> : null}
+      {authError ?<div className="toast-banner error">{authError}</div> : null}
       <Routes>
         <Route path="/acesso" element={<AccessPage ctx={authContext} />} />
         <Route path="/" element={<JobsPage ctx={authContext} />} />
         <Route
           path="/candidato"
           element={
-            initializing ? (
+            initializing ?(
               <PageLoading label="Preparando seu workspace..." />
-            ) : session ? (
+            ) : session ?(
               <CandidateWorkspace ctx={authContext} />
             ) : (
               <Navigate to={withTenant('/acesso', tenantId)} replace />
@@ -422,7 +431,7 @@ function PortalApp() {
           }
         />
       </Routes>
-      {session && profileModalOpen ? (
+      {session && profileModalOpen ?(
         <CandidateProfileModal ctx={authContext} onClose={() => setProfileModalOpen(false)} />
       ) : null}
     </div>
@@ -440,7 +449,7 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
   const [language, setLanguage] = useState<AccessLanguage>(() => {
     if (typeof window === 'undefined') return 'pt-BR'
     const stored = window.localStorage.getItem(ACCESS_LANGUAGE_STORAGE_KEY)
-    return stored === 'en-US' || stored === 'es-ES' || stored === 'pt-BR' ? stored : 'pt-BR'
+    return stored === 'en-US' || stored === 'es-ES' || stored === 'pt-BR' ?stored : 'pt-BR'
   })
   const [login, setLogin] = useState({ email: '', password: '' })
   const [register, setRegister] = useState({
@@ -465,14 +474,14 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
     setError(null)
 
     try {
-      const session = await portalRequest<AuthSession>(ctx.tenantId, '/api/public/portal-auth/login', {
+      const session = await portalRequest<AuthResponse>(ctx.tenantId, '/api/public/portal-auth/login', {
         method: 'POST',
         body: JSON.stringify({
           email: login.email.trim(),
           password: login.password,
         }),
       })
-      ctx.setSession(session)
+      ctx.setSession(normalizeAuthSession(session, ctx.tenantId))
       navigate(withTenant('/', ctx.tenantId))
     } catch (err) {
       setError(readError(err))
@@ -491,7 +500,7 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
         throw new Error('As senhas não conferem.')
       }
 
-      const session = await portalRequest<AuthSession>(ctx.tenantId, '/api/public/portal-auth/register', {
+      const session = await portalRequest<AuthResponse>(ctx.tenantId, '/api/public/portal-auth/register', {
         method: 'POST',
         body: JSON.stringify({
           nome: register.nome.trim(),
@@ -503,7 +512,7 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
         }),
       })
 
-      ctx.setSession(session)
+      ctx.setSession(normalizeAuthSession(session, ctx.tenantId))
       setShowRegisterModal(false)
       navigate(withTenant('/', ctx.tenantId))
     } catch (err) {
@@ -547,10 +556,10 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
               <input type="password" value={login.password} onChange={(e) => setLogin((v) => ({ ...v, password: e.target.value }))} required />
             </label>
 
-            {error ? <div className="inline-alert error auth-inline-alert">{error}</div> : null}
+            {error ?<div className="inline-alert error auth-inline-alert">{error}</div> : null}
 
             <button className="auth-submit" type="submit" disabled={pending}>
-              {pending ? text.processing : text.loginButton}
+              {pending ?text.processing : text.loginButton}
             </button>
 
             <div className="auth-links">
@@ -567,20 +576,20 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
         <div className="auth-page-container auth-language-inner">
           <span className="auth-language-label">{text.languageLabel}</span>
           <div className="language-flags auth-language-flags">
-            <button type="button" className={`auth-flag-btn${language === 'pt-BR' ? ' is-active' : ''}`} onClick={() => setLanguage('pt-BR')} title="Português">
+            <button type="button" className={`auth-flag-btn${language === 'pt-BR' ?' is-active' : ''}`} onClick={() => setLanguage('pt-BR')} title="Português">
               <img src="/images/flags/flag-br.svg" alt="Português" />
             </button>
-            <button type="button" className={`auth-flag-btn${language === 'en-US' ? ' is-active' : ''}`} onClick={() => setLanguage('en-US')} title="English">
+            <button type="button" className={`auth-flag-btn${language === 'en-US' ?' is-active' : ''}`} onClick={() => setLanguage('en-US')} title="English">
               <img src="/images/flags/flag-us.svg" alt="English" />
             </button>
-            <button type="button" className={`auth-flag-btn${language === 'es-ES' ? ' is-active' : ''}`} onClick={() => setLanguage('es-ES')} title="Español">
+            <button type="button" className={`auth-flag-btn${language === 'es-ES' ?' is-active' : ''}`} onClick={() => setLanguage('es-ES')} title="Español">
               <img src="/images/flags/flag-es.svg" alt="Español" />
             </button>
           </div>
         </div>
       </footer>
 
-      {showHelpModal ? (
+      {showHelpModal ?(
         <div className="auth-modal-backdrop" onClick={() => setShowHelpModal(false)}>
           <div className="auth-help-modal" onClick={(e) => e.stopPropagation()}>
             <div className="auth-help-modal-header">
@@ -607,7 +616,7 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
         </div>
       ) : null}
 
-      {showRegisterModal ? (
+      {showRegisterModal ?(
         <div className="auth-modal-backdrop">
           <div className="auth-help-modal auth-register-modal" onClick={(e) => e.stopPropagation()}>
             <div className="auth-help-modal-header">
@@ -654,14 +663,14 @@ function AccessPage({ ctx }: { ctx: AuthContext }) {
                 </label>
               </div>
 
-              {registerError ? <div className="inline-alert error auth-inline-alert">{registerError}</div> : null}
+              {registerError ?<div className="inline-alert error auth-inline-alert">{registerError}</div> : null}
 
               <div className="auth-help-modal-footer auth-register-footer">
                 <button className="auth-secondary-btn auth-modal-cancel" type="button" onClick={() => setShowRegisterModal(false)}>
                   {text.cancel}
                 </button>
                 <button className="auth-submit auth-modal-primary auth-submit-inline" type="submit" disabled={registerPending}>
-                  {registerPending ? text.processing : text.createAccess}
+                  {registerPending ?text.processing : text.createAccess}
                 </button>
               </div>
             </form>
@@ -699,7 +708,7 @@ function JobsPage({ ctx }: { ctx: AuthContext }) {
     setError(null)
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        setMessage(attempt === 1 ? 'Buscando oportunidades abertas...' : `API indisponível, tentando novamente (${attempt}/3)...`)
+        setMessage(attempt === 1 ?'Buscando oportunidades abertas...' : `API indisponível, tentando novamente (${attempt}/3)...`)
         const params = new URLSearchParams({
           tenantId: ctx.tenantId,
           page: '1',
@@ -826,7 +835,7 @@ function JobsPage({ ctx }: { ctx: AuthContext }) {
             </select>
           </div>
         </div>
-        {showFilters ? (
+        {showFilters ?(
           <section className="react-filters-panel">
             <div className="react-filters-grid">
               <input placeholder="Cidade ou UF" value={filters.location} onChange={(e) => setFilters((v) => ({ ...v, location: e.target.value }))} />
@@ -841,13 +850,13 @@ function JobsPage({ ctx }: { ctx: AuthContext }) {
             </div>
           </section>
         ) : null}
-        {loading ? (
+        {loading ?(
           <section className="jobs-loading-state">
             <div className="loader-ring" aria-hidden="true"></div>
             <p>{message}</p>
           </section>
         ) : null}
-        {!loading && error ? (
+        {!loading && error ?(
           <section className="empty-state service-unavailable-state">
             <div className="service-unavailable-icon" aria-hidden="true">
               <i className="fas fa-cloud-slash"></i>
@@ -857,14 +866,14 @@ function JobsPage({ ctx }: { ctx: AuthContext }) {
             <button className="toolbar-btn toolbar-btn-primary" type="button" onClick={() => void loadJobs()}>Tentar novamente</button>
           </section>
         ) : null}
-        {!loading && !error && jobs.length === 0 ? (
+        {!loading && !error && jobs.length === 0 ?(
           <section className="empty-state">
             <h3>Nenhuma vaga encontrada</h3>
             <p>Tente remover alguns filtros ou refinar o texto de busca.</p>
             <button className="toolbar-btn" type="button" onClick={clearFilters}>Limpar filtros</button>
           </section>
         ) : null}
-        {!loading && !error ? (
+        {!loading && !error ?(
           <section className="jobs-sections">
             {groupedJobs.map((group, groupIndex) => (
               <section className="job-section" key={group.title}>
@@ -908,7 +917,7 @@ function JobsPage({ ctx }: { ctx: AuthContext }) {
                             <span>{job.area || 'Área em definição'}</span>
                           </div>
                           <div className="job-tags-row">
-                            {(tags.length ? tags : ['Perfil geral']).slice(0, 6).map((tag) => (
+                            {(tags.length ?tags : ['Perfil geral']).slice(0, 6).map((tag) => (
                               <span className="job-tag" key={tag}>{tag}</span>
                             ))}
                           </div>
@@ -922,7 +931,7 @@ function JobsPage({ ctx }: { ctx: AuthContext }) {
             ))}
           </section>
         ) : null}
-        {selectedJob ? (
+        {selectedJob ?(
           <div className="modal-backdrop" onClick={() => setSelectedJob(null)}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
@@ -954,8 +963,8 @@ function JobsPage({ ctx }: { ctx: AuthContext }) {
                   <span>Currículo (PDF, DOC ou DOCX)</span>
                   <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => setApplyData((v) => ({ ...v, arquivo: e.target.files?.[0] ?? null }))} />
                 </label>
-                {applyResult ? <div className={`inline-alert ${applyResult.includes('sucesso') ? 'success' : 'error'}`}>{applyResult}</div> : null}
-                <button className="primary-btn" type="submit" disabled={applyPending}>{applyPending ? 'Enviando...' : 'Enviar candidatura'}</button>
+                {applyResult ?<div className={`inline-alert ${applyResult.includes('sucesso') ?'success' : 'error'}`}>{applyResult}</div> : null}
+                <button className="primary-btn" type="submit" disabled={applyPending}>{applyPending ?'Enviando...' : 'Enviar candidatura'}</button>
               </form>
             </div>
           </div>
@@ -976,11 +985,21 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [profile, setProfile] = useState<PortalProfile | null>(null)
   const [completion, setCompletion] = useState<PortalCompletion | null>(null)
-  const [matchesCount, setMatchesCount] = useState(0)
-  const [documentsCount, setDocumentsCount] = useState(0)
-  const [referencesCount, setReferencesCount] = useState(0)
+  const [matches, setMatches] = useState<PortalMatchItem[]>([])
+  const [portfolio, setPortfolio] = useState<PortalPortfolio | null>(null)
+  const [education, setEducation] = useState<PortalEducation | null>(null)
+  const [experience, setExperience] = useState<PortalExperienceProject | null>(null)
+  const [preferences, setPreferences] = useState<PortalPreferences | null>(null)
+  const [accessibility, setAccessibility] = useState<PortalAccessibility | null>(null)
+  const [agenda, setAgenda] = useState<PortalAgenda | null>(null)
+  const [notifications, setNotifications] = useState<PortalNotifications | null>(null)
+  const [lgpd, setLgpd] = useState<PortalLgpd | null>(null)
+  const [documents, setDocuments] = useState<PortalDocument[]>([])
+  const [references, setReferences] = useState<PortalReference[]>([])
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [form, setForm] = useState({
     nome: '',
     email: '',
@@ -988,6 +1007,150 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
     cidade: '',
     uf: '',
   })
+  const [portfolioPrefsForm, setPortfolioPrefsForm] = useState({
+    workModel: '',
+    availability: '',
+    salary: '',
+    shift: '',
+    note: '',
+  })
+  const [portfolioLinksForm, setPortfolioLinksForm] = useState({
+    linkedin: '',
+    github: '',
+    portfolio: '',
+    drive: '',
+  })
+  const [skillEditorOpen, setSkillEditorOpen] = useState(false)
+  const [editingSkillId, setEditingSkillId] = useState<string | null>(null)
+  const [skillDraft, setSkillDraft] = useState({
+    tipo: 'Hard',
+    nome: '',
+    nivel: 'Intermediário',
+    evidencia: '',
+  })
+  const [certEditorOpen, setCertEditorOpen] = useState(false)
+  const [editingCertId, setEditingCertId] = useState<string | null>(null)
+  const [certDraft, setCertDraft] = useState({
+    nome: '',
+    instituicao: '',
+    ano: '',
+    link: '',
+  })
+
+  useEffect(() => {
+    const { body, documentElement } = document
+    const previousBodyOverflow = body.style.overflow
+    const previousHtmlOverflow = documentElement.style.overflow
+    const previousBodyPaddingRight = body.style.paddingRight
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth
+
+    body.style.overflow = 'hidden'
+    documentElement.style.overflow = 'hidden'
+
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`
+    }
+
+    return () => {
+      body.style.overflow = previousBodyOverflow
+      documentElement.style.overflow = previousHtmlOverflow
+      body.style.paddingRight = previousBodyPaddingRight
+    }
+  }, [])
+
+  async function readProfileSnapshot() {
+    const [
+      profileData,
+      completionData,
+      matchesData,
+      portfolioData,
+      educationData,
+      experienceData,
+      preferencesData,
+      accessibilityData,
+      agendaData,
+      notificationsData,
+      documentsData,
+      referencesData,
+      lgpdData,
+    ] = await Promise.all([
+      authFetch<PortalProfile>(`/api/public/portal-candidates/${candidateId}`),
+      authFetch<PortalCompletion>(`/api/public/portal-candidates/${candidateId}/profile-completion`),
+      authFetch<{ matches: PortalMatchItem[] }>(`/api/public/portal-candidates/${candidateId}/job-matches`),
+      authFetch<PortalPortfolio>(`/api/public/portal-candidates/${candidateId}/skills-portfolio`),
+      authFetch<PortalEducation>(`/api/public/portal-candidates/${candidateId}/education`),
+      authFetch<PortalExperienceProject>(`/api/public/portal-candidates/${candidateId}/experience-projects`),
+      authFetch<PortalPreferences>(`/api/public/portal-candidates/${candidateId}/preferences`),
+      authFetch<PortalAccessibility>(`/api/public/portal-candidates/${candidateId}/accessibility`),
+      authFetch<PortalAgenda>(`/api/public/portal-candidates/${candidateId}/agenda`),
+      authFetch<PortalNotifications>(`/api/public/portal-candidates/${candidateId}/notifications`),
+      authFetch<{ items: PortalDocument[] }>(`/api/public/portal-candidates/${candidateId}/documents`),
+      authFetch<{ items: PortalReference[] }>(`/api/public/portal-candidates/${candidateId}/references`),
+      authFetch<PortalLgpd>(`/api/public/portal-candidates/${candidateId}/lgpd`),
+    ])
+
+    let avatarUrl: string | null = null
+    try {
+      avatarUrl = await fetchAuthorizedBlobUrl(ctx, `/api/public/portal-candidates/${candidateId}/avatar`)
+    } catch {
+      avatarUrl = null
+    }
+
+    return {
+      profileData,
+      completionData,
+      matches: matchesData.matches ?? [],
+      portfolioData,
+      educationData,
+      experienceData,
+      preferencesData,
+      accessibilityData,
+      agendaData,
+      notificationsData,
+      documents: documentsData.items ?? [],
+      references: referencesData.items ?? [],
+      lgpdData,
+      avatarUrl,
+    }
+  }
+
+  function applyProfileSnapshot(snapshot: Awaited<ReturnType<typeof readProfileSnapshot>>) {
+    setProfile(snapshot.profileData)
+    setCompletion(snapshot.completionData)
+    setMatches(snapshot.matches)
+    setPortfolio(snapshot.portfolioData)
+    setEducation(snapshot.educationData)
+    setExperience(snapshot.experienceData)
+    setPreferences(snapshot.preferencesData)
+    setAccessibility(snapshot.accessibilityData)
+    setAgenda(snapshot.agendaData)
+    setNotifications(snapshot.notificationsData)
+    setDocuments(snapshot.documents)
+    setReferences(snapshot.references)
+    setLgpd(snapshot.lgpdData)
+    setAvatarPreview(snapshot.avatarUrl)
+    setForm({
+      nome: snapshot.profileData.nome ?? '',
+      email: snapshot.profileData.email ?? '',
+      fone: snapshot.profileData.fone ?? '',
+      cidade: snapshot.profileData.cidade ?? '',
+      uf: snapshot.profileData.uf ?? '',
+    })
+  }
+
+  async function refreshProfileModal(options?: { keepMessage?: boolean }) {
+    if (!candidateId) return
+    setLoading(true)
+    if (!options?.keepMessage) setMessage(null)
+    try {
+      const snapshot = await readProfileSnapshot()
+      applyProfileSnapshot(snapshot)
+    } catch (err) {
+      setMessage(readError(err))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!candidateId) return
@@ -997,28 +1160,9 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
       setLoading(true)
       setMessage(null)
       try {
-        const [profileData, completionData, matchesData, documentsData, referencesData] = await Promise.all([
-          authFetch<PortalProfile>(`/api/public/portal-candidates/${candidateId}`),
-          authFetch<PortalCompletion>(`/api/public/portal-candidates/${candidateId}/profile-completion`),
-          authFetch<{ matches: PortalMatchItem[] }>(`/api/public/portal-candidates/${candidateId}/job-matches`),
-          authFetch<{ items: PortalDocument[] }>(`/api/public/portal-candidates/${candidateId}/documents`),
-          authFetch<{ items: PortalReference[] }>(`/api/public/portal-candidates/${candidateId}/references`),
-        ])
-
+        const snapshot = await readProfileSnapshot()
         if (cancelled) return
-
-        setProfile(profileData)
-        setCompletion(completionData)
-        setMatchesCount(matchesData.matches?.length ?? 0)
-        setDocumentsCount(documentsData.items?.length ?? 0)
-        setReferencesCount(referencesData.items?.length ?? 0)
-        setForm({
-          nome: profileData.nome ?? '',
-          email: profileData.email ?? '',
-          fone: profileData.fone ?? '',
-          cidade: profileData.cidade ?? '',
-          uf: profileData.uf ?? '',
-        })
+        applyProfileSnapshot(snapshot)
       } catch (err) {
         if (!cancelled) setMessage(readError(err))
       } finally {
@@ -1031,8 +1175,168 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
     }
   }, [authFetch, candidateId])
 
-  async function handleSave(event: FormEvent) {
-    event.preventDefault()
+  useEffect(() => {
+    setPortfolioPrefsForm({
+      workModel: portfolio?.preferences.workModel ?? '',
+      availability: portfolio?.preferences.availability ?? '',
+      salary: portfolio?.preferences.salary ?? '',
+      shift: portfolio?.preferences.shift ?? '',
+      note: portfolio?.preferences.note ?? '',
+    })
+    setPortfolioLinksForm({
+      linkedin: portfolio?.links.linkedin ?? '',
+      github: portfolio?.links.github ?? '',
+      portfolio: portfolio?.links.portfolio ?? '',
+      drive: portfolio?.links.drive ?? '',
+    })
+  }, [portfolio])
+
+  async function saveJson(path: string, payload: unknown, successText: string, method: 'PUT' | 'POST' = 'PUT') {
+    try {
+      await authFetch(path, {
+        method,
+        body: JSON.stringify(payload),
+      })
+      setMessage(successText)
+      await refreshProfileModal({ keepMessage: true })
+    } catch (err) {
+      setMessage(readError(err))
+    }
+  }
+
+  async function removeItem(path: string, successText: string) {
+    try {
+      await authFetch(path, { method: 'DELETE' })
+      setMessage(successText)
+      await refreshProfileModal({ keepMessage: true })
+    } catch (err) {
+      setMessage(readError(err))
+    }
+  }
+
+  async function uploadFile(path: string, fieldName: string, file: File, successText: string) {
+    const formData = new FormData()
+    formData.append(fieldName, file)
+    try {
+      await authFetch(path, {
+        method: 'POST',
+        body: formData,
+      }, false)
+      setMessage(successText)
+      await refreshProfileModal({ keepMessage: true })
+    } catch (err) {
+      setMessage(readError(err))
+    }
+  }
+
+  function buildPortfolioSummaryPayload(
+    prefs = portfolioPrefsForm,
+    links = portfolioLinksForm,
+  ) {
+    return {
+      workModel: prefs.workModel,
+      availability: prefs.availability,
+      salary: prefs.salary,
+      shift: prefs.shift,
+      note: prefs.note,
+      linkedin: links.linkedin,
+      github: links.github,
+      portfolio: links.portfolio,
+      drive: links.drive,
+      tags: portfolio?.tags ?? '',
+    }
+  }
+
+  async function savePortfolioSummary(
+    prefs = portfolioPrefsForm,
+    links = portfolioLinksForm,
+    successText = 'Competências & portfólio atualizados.',
+  ) {
+    await saveJson(
+      `/api/public/portal-candidates/${candidateId}/skills-portfolio`,
+      buildPortfolioSummaryPayload(prefs, links),
+      successText,
+    )
+  }
+
+  function openPortfolioLink(url?: string | null) {
+    const value = (url ?? '').trim()
+    if (!value) {
+      setMessage('Nenhum link salvo ainda.')
+      return
+    }
+    window.open(value, '_blank', 'noopener,noreferrer')
+  }
+
+  function openSkillEditor(skill?: PortalSkill) {
+    setEditingSkillId(skill?.id ?? null)
+    setSkillDraft({
+      tipo: skill?.tipo ?? 'Hard',
+      nome: skill?.nome ?? '',
+      nivel: skill?.nivel ?? 'Intermediário',
+      evidencia: skill?.evidencia ?? '',
+    })
+    setSkillEditorOpen(true)
+  }
+
+  async function saveSkillEditor() {
+    if (!skillDraft.nome.trim()) {
+      setMessage('Informe o nome da competência.')
+      return
+    }
+    const path = editingSkillId
+      ?`/api/public/portal-candidates/${candidateId}/skills-portfolio/skills/${editingSkillId}`
+      : `/api/public/portal-candidates/${candidateId}/skills-portfolio/skills`
+    await saveJson(
+      path,
+      {
+        tipo: skillDraft.tipo,
+        nome: skillDraft.nome.trim(),
+        nivel: skillDraft.nivel,
+        evidencia: skillDraft.evidencia.trim(),
+      },
+      editingSkillId ?'Competência atualizada.' : 'Competência adicionada.',
+      editingSkillId ?'PUT' : 'POST',
+    )
+    setSkillEditorOpen(false)
+    setEditingSkillId(null)
+  }
+
+  function openCertificationEditor(cert?: PortalCertification) {
+    setEditingCertId(cert?.id ?? null)
+    setCertDraft({
+      nome: cert?.nome ?? '',
+      instituicao: cert?.instituicao ?? '',
+      ano: cert?.ano ?? '',
+      link: cert?.link ?? '',
+    })
+    setCertEditorOpen(true)
+  }
+
+  async function saveCertificationEditor() {
+    if (!certDraft.nome.trim()) {
+      setMessage('Informe o nome da certificação.')
+      return
+    }
+    const path = editingCertId
+      ?`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications/${editingCertId}`
+      : `/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications`
+    await saveJson(
+      path,
+      {
+        nome: certDraft.nome.trim(),
+        instituicao: certDraft.instituicao.trim(),
+        ano: certDraft.ano.trim(),
+        link: certDraft.link.trim(),
+      },
+      editingCertId ?'Certificação atualizada.' : 'Certificação adicionada.',
+      editingCertId ?'PUT' : 'POST',
+    )
+    setCertEditorOpen(false)
+    setEditingCertId(null)
+  }
+
+  async function handleSave() {
     setSaving(true)
     setMessage(null)
     try {
@@ -1057,12 +1361,29 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
         uf: result.uf ?? '',
       }))
       setMessage('Perfil atualizado com sucesso.')
+      await refreshProfileModal({ keepMessage: true })
     } catch (err) {
       setMessage(readError(err))
     } finally {
       setSaving(false)
     }
   }
+
+  async function handleResetProfile() {
+    if (!window.confirm('Tem certeza que deseja limpar o perfil do candidato?')) return
+    setMessage(null)
+    try {
+      await authFetch(`/api/public/portal-candidates/${candidateId}/profile/reset`, { method: 'POST' })
+      setSelectedSection(null)
+      setMessage('Perfil limpo com sucesso.')
+      await refreshProfileModal({ keepMessage: true })
+    } catch (err) {
+      setMessage(readError(err))
+    }
+  }
+
+  const matchesCount = matches.length
+  const referencesCount = references.length
 
   const sectionTiles = [
     { key: 'perfil', label: 'Perfil', icon: 'fa-user', value: completion?.sections?.perfil ?? completion?.overall ?? 0, kind: 'percent' as const },
@@ -1072,19 +1393,22 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
     { key: 'exp', label: 'Experiência & Projetos', icon: 'fa-briefcase', value: completion?.sections?.exp ?? 0, kind: 'percent' as const },
     { key: 'lgpd', label: 'Privacidade (LGPD)', icon: 'fa-shield-alt', value: completion?.sections?.lgpd ?? 0, kind: 'percent' as const },
     { key: 'pref', label: 'Preferências / Objetivos', icon: 'fa-bullseye', value: completion?.sections?.pref ?? 0, kind: 'percent' as const },
-    { key: 'docs', label: 'Documentos & Anexos', icon: 'fa-paperclip', value: documentsCount, kind: 'count' as const },
+    { key: 'docs', label: 'Documentos & Anexos', icon: 'fa-paperclip', value: documents.length, kind: 'count' as const },
     { key: 'refs', label: 'Referências', icon: 'fa-users', value: referencesCount, kind: 'count' as const },
     { key: 'acess', label: 'Acessibilidade & Inclusão', icon: 'fa-universal-access', value: completion?.sections?.acess ?? 0, kind: 'percent' as const },
     { key: 'agenda', label: 'Disponibilidade & Agenda', icon: 'fa-calendar-alt', value: completion?.sections?.agenda ?? 0, kind: 'percent' as const },
     { key: 'hist', label: 'Histórico de Candidaturas', icon: 'fa-history', value: completion?.sections?.hist ?? 0, kind: 'percent' as const },
     { key: 'notif', label: 'Notificações & Comunicação', icon: 'fa-bell', value: completion?.sections?.notif ?? 0, kind: 'percent' as const },
     { key: 'matches', label: 'Vagas sugeridas', icon: 'fa-star', value: matchesCount, kind: 'count' as const },
+    { key: 'clear', label: 'Limpar perfil', icon: 'fa-eraser', value: 0, kind: 'action' as const },
   ]
+
+  const selectedTile = selectedSection ? sectionTiles.find((tile) => tile.key === selectedSection) ?? null : null
 
   return (
     <div className="modal-backdrop profile-modal-backdrop">
       <div className="profile-modal-card" onClick={(event) => event.stopPropagation()}>
-        <form onSubmit={handleSave}>
+        <div>
           <div className="profile-modal-header">
             <div>
               <h2 className="profile-modal-title">Meu perfil</h2>
@@ -1093,11 +1417,11 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
             <div className="profile-modal-header-actions">
               <button className="profile-modal-action secondary" type="button" onClick={() => void openResumeHtml(authFetch, candidateId)}>
                 <i className="fas fa-eye" aria-hidden="true"></i>
-                <span>Visualizar curriculo</span>
+                <span>Visualizar currículo</span>
               </button>
               <button className="profile-modal-action primary" type="button" onClick={() => void downloadResumePdf(authFetch, candidateId)}>
                 <i className="fas fa-file-pdf" aria-hidden="true"></i>
-                <span>Baixar curriculo</span>
+                <span>Baixar currículo</span>
               </button>
               <button type="button" className="profile-modal-close" onClick={onClose} aria-label="Fechar">
                 <i className="fas fa-times" aria-hidden="true"></i>
@@ -1106,12 +1430,28 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
           </div>
 
           <div className="profile-modal-body">
-            {loading ? (
+            {message ?<div className={`inline-alert ${message.includes('sucesso') ?'success' : 'error'}`}>{message}</div> : null}
+            {loading ?(
               <PageLoading label="Sincronizando seu perfil e suas preferências..." />
             ) : (
-              <div className="profile-modal-grid">
+              <div className={`profile-modal-grid${selectedSection ?' is-detail' : ''}`}>
+                {!selectedSection ?(
                 <section className="profile-left-panel">
                   <div className="profile-panel-title">Dados do candidato</div>
+
+                  <div className="profile-avatar-panel">
+                    <div className="profile-avatar-circle">
+                      {avatarPreview ?(
+                        <img src={avatarPreview} alt={profile?.nome || 'Avatar do candidato'} />
+                      ) : (
+                        <span>{getInitials(form.nome || ctx.session?.candidate.nome || 'Candidato')}</span>
+                      )}
+                    </div>
+                    <div className="profile-avatar-meta">
+                      <strong>{form.nome || 'Candidato'}</strong>
+                      <span>{completion?.overall ?? 0}% preenchido</span>
+                    </div>
+                  </div>
 
                   <label className="auth-field">
                     <span>Nome completo</span>
@@ -1144,34 +1484,749 @@ function CandidateProfileModal({ ctx, onClose }: CandidateProfileModalProps) {
                     <span>Seus dados são tratados de acordo com a LGPD.</span>
                   </div>
                 </section>
+                ) : null}
 
-                <section className="profile-right-panel">
-                  <div className="profile-sections-grid">
-                    {sectionTiles.map((tile) => (
-                      <article className="profile-section-tile" key={tile.key}>
-                        <div className="profile-section-badge">
-                          {tile.kind === 'percent' ? `${tile.value}%` : tile.value}
+                <section className={`profile-right-panel${selectedSection ?' is-detail' : ''}`}>
+                  {!selectedSection ?(
+                    <div className="profile-sections-grid">
+                      {sectionTiles.map((tile) => (
+                        <article
+                          className="profile-section-tile"
+                          key={tile.key}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedSection(tile.key)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              setSelectedSection(tile.key)
+                            }
+                          }}
+                        >
+                          {tile.kind !== 'action' ?(
+                            <div className="profile-section-badge">
+                              {tile.kind === 'percent' ?`${tile.value}%` : tile.value}
+                            </div>
+                          ) : null}
+                          <div className="profile-section-icon">
+                            <i className={`fas ${tile.icon}`} aria-hidden="true"></i>
+                          </div>
+                          <div className="profile-section-label">{tile.label}</div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="profile-section-detail">
+                      {selectedSection !== 'comp' ?(
+                        <div className="profile-section-detail-head">
+                          <div>
+                            <div className="profile-section-detail-title">{selectedTile?.label}</div>
+                            <div className="profile-section-detail-subtitle">Detalhes da seção selecionada.</div>
+                          </div>
+                          <button className="profile-back-button" type="button" onClick={() => setSelectedSection(null)}>
+                            <i className="fas fa-arrow-left" aria-hidden="true"></i>
+                            <span>Voltar às seções</span>
+                          </button>
                         </div>
-                        <div className="profile-section-icon">
-                          <i className={`fas ${tile.icon}`} aria-hidden="true"></i>
+                      ) : null}
+
+                      {selectedSection === 'perfil' ?(
+                        <div className="profile-section-detail-body">
+                          <div className="profile-shell">
+                            <div className="avatar-plate">
+                              {avatarPreview ?<img src={avatarPreview} alt={profile?.nome || 'Avatar do candidato'} /> : <span>{getInitials(profile?.nome || ctx.session?.candidate.nome || 'Candidato')}</span>}
+                            </div>
+                            <label className="upload-label">
+                              Alterar avatar
+                              <input type="file" accept="image/*" onChange={(event) => {
+                                const file = event.target.files?.[0]
+                                if (file) void uploadFile(`/api/public/portal-candidates/${candidateId}/avatar`, 'arquivo', file, 'Avatar atualizado.')
+                              }} />
+                            </label>
+                          </div>
+
+                          <RecordForm
+                            fields={[
+                              field('Nome', profile?.nome),
+                              field('Telefone', profile?.fone),
+                              field('Cidade', profile?.cidade),
+                              field('UF', profile?.uf),
+                              field('LinkedIn', profile?.linkedinUrl),
+                              field('Resumo', profile?.resumoProfissional, 'textarea'),
+                            ]}
+                            onSubmit={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}`, {
+                              nome: values.Nome,
+                              fone: values.Telefone,
+                              cidade: values.Cidade,
+                              uf: values.UF,
+                              linkedinUrl: values.LinkedIn,
+                              resumoProfissional: values.Resumo,
+                            }, 'Perfil atualizado.')}
+                          />
+
+                          <div className="toolbar-row">
+                            <label className="upload-label">
+                              Enviar currículo
+                              <input type="file" accept=".pdf,.doc,.docx" onChange={(event) => {
+                                const file = event.target.files?.[0]
+                                if (file) void uploadFile(`/api/public/portal-candidates/${candidateId}/curriculos`, 'arquivo', file, 'Currículo enviado.')
+                              }} />
+                            </label>
+                            <label className="upload-label">
+                              Parsear currículo
+                              <input type="file" accept=".pdf,.doc,.docx" onChange={(event) => {
+                                const file = event.target.files?.[0]
+                                if (!file) return
+                                const formData = new FormData()
+                                formData.append('arquivo', file)
+                                void authFetch<Record<string, unknown>>(`/api/public/portal-candidates/${candidateId}/parse-resume`, { method: 'POST', body: formData }, false)
+                                  .then(() => setMessage('Currículo processado com sucesso.'))
+                                  .catch((err) => setMessage(readError(err)))
+                              }} />
+                            </label>
+                          </div>
                         </div>
-                        <div className="profile-section-label">{tile.label}</div>
-                      </article>
-                    ))}
-                  </div>
+                      ) : null}
+
+                      {selectedSection === 'testes' ?(
+                        <div className="profile-section-detail-body">
+                          <div className="detail-group">
+                            <div className="detail-group-title">Testes de RH</div>
+                            <p className="detail-paragraph">
+                              Complete os testes para enriquecer seu perfil e aumentar o match com as vagas.
+                            </p>
+                            <div className="detail-callout">
+                              <strong>Status atual:</strong> {completion?.sections?.testes ?? 0}% preenchido.
+                            </div>
+                          </div>
+                          <div className="detail-group">
+                            <div className="detail-group-title">Privacidade</div>
+                            <p className="detail-paragraph">
+                              No MVP React, os testes ainda serão trazidos em detalhe como no .NET. A estrutura da seção e o fluxo de navegação já foram espelhados.
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'comp' ?(
+                        <div className="profile-section-detail-body">
+                          <div className="profile-detail-toolbar">
+                            <div>
+                              <div className="profile-section-detail-title">Competências & Portfólio</div>
+                              <div className="profile-section-detail-subtitle">Organize skills, idiomas, certificados e links.</div>
+                            </div>
+                            <div className="profile-detail-toolbar-actions">
+                              <button className="profile-back-button" type="button" onClick={() => setSelectedSection(null)}>
+                                <i className="fas fa-arrow-left" aria-hidden="true"></i>
+                                <span>Voltar às seções</span>
+                              </button>
+                              <button className="profile-clear-button" type="button" onClick={() => void saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio`, {
+                                workModel: '',
+                                availability: '',
+                                salary: '',
+                                shift: '',
+                                note: '',
+                                linkedin: '',
+                                github: '',
+                                portfolio: '',
+                                drive: '',
+                                tags: '',
+                              }, 'Competências & portfólio limpos.')}>
+                                <i className="fas fa-eraser" aria-hidden="true"></i>
+                                <span>Limpar</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="profile-skill-top-grid">
+                            <section className="profile-skill-card">
+                              <div className="profile-skill-card-title"><i className="fas fa-briefcase" aria-hidden="true"></i><span>Preferências</span></div>
+                              <div className="profile-skill-fields-grid">
+                                <label className="profile-mini-field">
+                                  <span>Modelo de trabalho</span>
+                                  <select
+                                    value={portfolioPrefsForm.workModel}
+                                    onChange={(e) => setPortfolioPrefsForm((v) => ({ ...v, workModel: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  >
+                                    <option value="">Selecionar</option>
+                                    <option value="Presencial">Presencial</option>
+                                    <option value="Híbrido">Híbrido</option>
+                                    <option value="Remoto">Remoto</option>
+                                  </select>
+                                </label>
+                                <label className="profile-mini-field">
+                                  <span>Disponibilidade</span>
+                                  <select
+                                    value={portfolioPrefsForm.availability}
+                                    onChange={(e) => setPortfolioPrefsForm((v) => ({ ...v, availability: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  >
+                                    <option value="">Selecionar</option>
+                                    <option value="Imediata">Imediata</option>
+                                    <option value="Até 15 dias">Até 15 dias</option>
+                                    <option value="Até 30 dias">Até 30 dias</option>
+                                    <option value="A combinar">A combinar</option>
+                                  </select>
+                                </label>
+                                <label className="profile-mini-field">
+                                  <span>Pretensão (R$)</span>
+                                  <input
+                                    placeholder="Ex.: 4500"
+                                    value={portfolioPrefsForm.salary}
+                                    onChange={(e) => setPortfolioPrefsForm((v) => ({ ...v, salary: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  />
+                                </label>
+                                <label className="profile-mini-field">
+                                  <span>Turno</span>
+                                  <select
+                                    value={portfolioPrefsForm.shift}
+                                    onChange={(e) => setPortfolioPrefsForm((v) => ({ ...v, shift: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  >
+                                    <option value="">Selecionar</option>
+                                    <option value="Diurno">Diurno</option>
+                                    <option value="Noturno">Noturno</option>
+                                    <option value="Escala">Escala</option>
+                                    <option value="A combinar">A combinar</option>
+                                  </select>
+                                </label>
+                                <label className="profile-mini-field profile-mini-field-full">
+                                  <span>Observação</span>
+                                  <input
+                                    placeholder="Ex.: Disponível para viagens"
+                                    value={portfolioPrefsForm.note}
+                                    onChange={(e) => setPortfolioPrefsForm((v) => ({ ...v, note: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  />
+                                </label>
+                              </div>
+                            </section>
+
+                            <section className="profile-skill-card">
+                              <div className="profile-skill-card-title"><i className="fas fa-link" aria-hidden="true"></i><span>Links de portfólio</span></div>
+                              <div className="profile-skill-fields-grid">
+                                <label className="profile-mini-field">
+                                  <span>LinkedIn</span>
+                                  <input
+                                    placeholder="https://linkedin.com/in/..."
+                                    value={portfolioLinksForm.linkedin}
+                                    onChange={(e) => setPortfolioLinksForm((v) => ({ ...v, linkedin: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  />
+                                </label>
+                                <label className="profile-mini-field">
+                                  <span>GitHub</span>
+                                  <input
+                                    placeholder="https://github.com/..."
+                                    value={portfolioLinksForm.github}
+                                    onChange={(e) => setPortfolioLinksForm((v) => ({ ...v, github: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  />
+                                </label>
+                                <label className="profile-mini-field">
+                                  <span>Portfólio</span>
+                                  <input
+                                    placeholder="https://..."
+                                    value={portfolioLinksForm.portfolio}
+                                    onChange={(e) => setPortfolioLinksForm((v) => ({ ...v, portfolio: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  />
+                                </label>
+                                <label className="profile-mini-field">
+                                  <span>Drive / Certificados</span>
+                                  <input
+                                    placeholder="https://drive.google.com/..."
+                                    value={portfolioLinksForm.drive}
+                                    onChange={(e) => setPortfolioLinksForm((v) => ({ ...v, drive: e.target.value }))}
+                                    onBlur={() => void savePortfolioSummary()}
+                                  />
+                                </label>
+                                <div className="profile-link-actions">
+                                  <button className="profile-link-button" type="button" onClick={() => openPortfolioLink(portfolioLinksForm.linkedin)}>
+                                    <i className="fab fa-linkedin" aria-hidden="true"></i><span>Abrir LinkedIn</span>
+                                  </button>
+                                  <button className="profile-link-button" type="button" onClick={() => openPortfolioLink(portfolioLinksForm.github)}>
+                                    <i className="fab fa-github" aria-hidden="true"></i><span>Abrir GitHub</span>
+                                  </button>
+                                  <button className="profile-link-button" type="button" onClick={() => openPortfolioLink(portfolioLinksForm.portfolio)}>
+                                    <i className="fas fa-globe" aria-hidden="true"></i><span>Abrir Portfólio</span>
+                                  </button>
+                                  <button className="profile-link-button" type="button" onClick={() => openPortfolioLink(portfolioLinksForm.drive)}>
+                                    <i className="fab fa-google-drive" aria-hidden="true"></i><span>Abrir Drive</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </section>
+                          </div>
+
+                          <section className="profile-block-card">
+                            <div className="profile-block-head">
+                              <div className="profile-block-title">
+                                <i className="fas fa-tools" aria-hidden="true"></i>
+                                <span>Competências</span>
+                                <small>(Hard/Soft/Idiomas)</small>
+                              </div>
+                              <button className="profile-add-button" type="button" onClick={() => openSkillEditor()}>
+                                <i className="fas fa-plus" aria-hidden="true"></i><span>Adicionar</span>
+                              </button>
+                            </div>
+                            {portfolio?.skills?.length ?(
+                              <div className="profile-chip-list">
+                                {portfolio.skills.map((skill) => (
+                                  <button key={skill.id} className="profile-skill-chip" type="button" onClick={() => openSkillEditor(skill)}>
+                                    <span className="profile-skill-chip-main">{skill.nome}</span>
+                                    <span className="profile-skill-chip-meta">{skill.nivel}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="profile-empty-note">Nenhuma competência adicionada ainda.</div>
+                            )}
+                          </section>
+
+                          <section className="profile-block-card">
+                            <div className="profile-block-head">
+                              <div className="profile-block-title">
+                                <i className="fas fa-certificate" aria-hidden="true"></i>
+                                <span>Certificações & Cursos</span>
+                              </div>
+                              <button className="profile-add-button" type="button" onClick={() => openCertificationEditor()}>
+                                <i className="fas fa-plus" aria-hidden="true"></i><span>Adicionar</span>
+                              </button>
+                            </div>
+                            {portfolio?.certifications?.length ?(
+                              <div className="profile-cert-list">
+                                {portfolio.certifications.map((cert) => (
+                                  <article className="profile-cert-item" key={cert.id}>
+                                    <div>
+                                      <strong>{cert.nome}</strong>
+                                      <p>{[cert.instituicao, cert.ano].filter(Boolean).join(' • ') || 'Sem detalhes adicionais'}</p>
+                                    </div>
+                                    <div className="profile-cert-actions">
+                                      <button className="ghost-btn" type="button" onClick={() => openCertificationEditor(cert)}>Editar</button>
+                                      <button className="ghost-btn danger" type="button" onClick={() => void removeItem(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications/${cert.id}`, 'Certificação removida.')}>Remover</button>
+                                    </div>
+                                  </article>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="profile-empty-note">Nenhum curso/certificação informado ainda.</div>
+                            )}
+                          </section>
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'formacao' ?(
+                        <div className="profile-section-detail-body">
+                          <RecordForm
+                            fields={[
+                              field('nivel', education?.summary.nivel),
+                              field('areaPrincipal', education?.summary.areaPrincipal),
+                              field('situacao', education?.summary.situacao),
+                              field('destaques', education?.summary.destaques),
+                            ]}
+                            onSubmit={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/education`, values, 'Resumo educacional salvo.')}
+                          />
+
+                          <RepeaterSection
+                            title="Cursos e formações"
+                            items={education?.items ?? []}
+                            describe={(item) => `${item.instituicao || 'Instituição livre'} • ${item.status || 'Status aberto'}`}
+                            fields={[
+                              { name: 'curso', label: 'Curso' },
+                              { name: 'instituicao', label: 'Instituição' },
+                              { name: 'tipo', label: 'Tipo' },
+                              { name: 'status', label: 'Status' },
+                              { name: 'inicio', label: 'Inicio' },
+                              { name: 'fim', label: 'Fim' },
+                              { name: 'observacoes', label: 'Observações' },
+                              { name: 'link', label: 'Link' },
+                            ]}
+                            onAdd={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/education/items`, values, 'Formacao adicionada.', 'POST')}
+                            onDelete={(item) => void removeItem(`/api/public/portal-candidates/${candidateId}/education/items/${item.id}`, 'Formacao removida.')}
+                          />
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'exp' ?(
+                        <div className="profile-section-detail-body">
+                          <RepeaterSection
+                            title="Experiências"
+                            items={experience?.experiences ?? []}
+                            describe={(item) => `${item.cargo} • ${item.inicio || '?'} a ${item.fim || 'atual'}`}
+                            fields={[
+                              { name: 'empresa', label: 'Empresa' },
+                              { name: 'cargo', label: 'Cargo' },
+                              { name: 'inicio', label: 'Inicio' },
+                              { name: 'fim', label: 'Fim' },
+                              { name: 'local', label: 'Local / modelo' },
+                              { name: 'atividades', label: 'Atividades' },
+                            ]}
+                            onAdd={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/experiences`, values, 'Experiencia adicionada.', 'POST')}
+                            onDelete={(item) => void removeItem(`/api/public/portal-candidates/${candidateId}/experiences/${item.id}`, 'Experiencia removida.')}
+                          />
+
+                          <RepeaterSection
+                            title="Projetos"
+                            items={experience?.projects ?? []}
+                            describe={(item) => `${item.periodo || 'Período livre'} • ${item.stack || 'Stack aberta'}`}
+                            fields={[
+                              { name: 'nome', label: 'Nome' },
+                              { name: 'periodo', label: 'Período' },
+                              { name: 'descricao', label: 'Descrição' },
+                              { name: 'link', label: 'Link' },
+                              { name: 'stack', label: 'Stack' },
+                              { name: 'destaques', label: 'Destaques' },
+                            ]}
+                            onAdd={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/projects`, values, 'Projeto adicionado.', 'POST')}
+                            onDelete={(item) => void removeItem(`/api/public/portal-candidates/${candidateId}/projects/${item.id}`, 'Projeto removido.')}
+                          />
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'lgpd' ?(
+                        <div className="profile-section-detail-body">
+                          <RecordForm
+                            fields={[
+                              field('retencaoMeses', lgpd?.retencaoMeses?.toString() ?? ''),
+                              field('compartilhamento', lgpd?.compartilhamento),
+                            ]}
+                            checks={[
+                              check('processarCandidatura', lgpd?.processarCandidatura),
+                              check('permitirContato', lgpd?.permitirContato),
+                              check('bancoTalentos', lgpd?.bancoTalentos),
+                              check('dadosSensiveis', lgpd?.dadosSensiveis),
+                              check('comunicacoes', lgpd?.comunicacoes),
+                            ]}
+                            onSubmit={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/lgpd`, {
+                              ...values,
+                              retencaoMeses: values.retencaoMeses ?Number(values.retencaoMeses) : null,
+                            }, 'Preferências LGPD atualizadas.')}
+                          />
+                          <button className="secondary-btn" type="button" onClick={() => void openLgpdReceipt(authFetch, candidateId)}>Abrir comprovante LGPD</button>
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'pref' ?(
+                        <div className="profile-section-detail-body">
+                          <RecordForm
+                            fields={[
+                              field('CargoAlvo', asString(preferences?.CargoAlvo)),
+                              field('Senioridade', asString(preferences?.Senioridade)),
+                              field('InicioDisponivel', asString(preferences?.InicioDisponivel)),
+                              field('Resumo', asString(preferences?.Resumo), 'textarea'),
+                              field('AreasInteresse', asString(preferences?.AreasInteresse)),
+                              field('ModeloTrabalho', asString(preferences?.ModeloTrabalho)),
+                              field('Jornada', asString(preferences?.Jornada)),
+                              field('TipoContrato', asString(preferences?.TipoContrato)),
+                              field('Viagens', asString(preferences?.Viagens)),
+                              field('Mudanca', asString(preferences?.Mudanca)),
+                              field('CidadePreferida', asString(preferences?.CidadePreferida)),
+                              field('DistanciaMaxKm', asString(preferences?.DistanciaMaxKm)),
+                              field('ObsDeslocamento', asString(preferences?.ObsDeslocamento)),
+                              field('PretensaoSalarial', asString(preferences?.PretensaoSalarial)),
+                              field('PretensaoNegociavel', asString(preferences?.PretensaoNegociavel)),
+                              field('BeneficiosDesejados', asString(preferences?.BeneficiosDesejados)),
+                              field('NaoAbreMaoDe', asString(preferences?.NaoAbreMaoDe)),
+                            ]}
+                            onSubmit={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/preferences`, values, 'Preferências salvas.')}
+                          />
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'docs' ?(
+                        <div className="profile-section-detail-body">
+                          <RepeaterSection
+                            title="Documentos"
+                            items={documents}
+                            describe={(item) => `${item.tipo} • ${item.data || 'Sem data'}${item.fileName ?` • ${item.fileName}` : ''}`}
+                            fields={[
+                              { name: 'tipo', label: 'Tipo' },
+                              { name: 'nome', label: 'Nome' },
+                              { name: 'link', label: 'Link' },
+                              { name: 'data', label: 'Data' },
+                              { name: 'observacoes', label: 'Observações' },
+                              { name: 'fileName', label: 'Nome do arquivo' },
+                            ]}
+                            onAdd={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/documents`, values, 'Documento salvo.', 'POST')}
+                            onDelete={(item) => void removeItem(`/api/public/portal-candidates/${candidateId}/documents/${item.id}`, 'Documento removido.')}
+                          />
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'refs' ?(
+                        <div className="profile-section-detail-body">
+                          <RepeaterSection
+                            title="Referências"
+                            items={references}
+                            describe={(item) => `${item.relacao || 'Relação livre'} • ${item.contato || 'Contato não informado'}`}
+                            fields={[
+                              { name: 'nome', label: 'Nome' },
+                              { name: 'relacao', label: 'Relação' },
+                              { name: 'empresa', label: 'Empresa' },
+                              { name: 'cargo', label: 'Cargo' },
+                              { name: 'contato', label: 'Contato' },
+                              { name: 'periodo', label: 'Período' },
+                              { name: 'linkedin', label: 'LinkedIn' },
+                              { name: 'observacoes', label: 'Observações' },
+                              { name: 'podeContatar', label: 'Pode contatar?(true/false)' },
+                            ]}
+                            onAdd={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/references`, {
+                              ...values,
+                              podeContatar: Boolean(values.podeContatar),
+                            }, 'Referência salva.', 'POST')}
+                            onDelete={(item) => void removeItem(`/api/public/portal-candidates/${candidateId}/references/${item.id}`, 'Referência removida.')}
+                          />
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'acess' ?(
+                        <div className="profile-section-detail-body">
+                          <RecordForm
+                            fields={[
+                              field('idioma', accessibility?.idioma),
+                              field('canal', accessibility?.canal),
+                              field('melhorHorario', accessibility?.melhorHorario),
+                              field('observacoesComunicacao', accessibility?.observacoesComunicacao, 'textarea'),
+                              field('detalhesNecessidades', accessibility?.detalhesNecessidades, 'textarea'),
+                              field('pcdIdentificacao', accessibility?.pcdIdentificacao),
+                              field('pcdTipo', accessibility?.pcdTipo),
+                              field('pcdComprovacao', accessibility?.pcdComprovacao),
+                              field('pcdObservacoes', accessibility?.pcdObservacoes, 'textarea'),
+                            ]}
+                            checks={[
+                              check('precisaLegendas', accessibility?.precisaLegendas),
+                              check('precisaInterprete', accessibility?.precisaInterprete),
+                              check('precisaLeitorTela', accessibility?.precisaLeitorTela),
+                              check('precisaBaixaEstimulo', accessibility?.precisaBaixaEstimulo),
+                              check('precisaMobilidade', accessibility?.precisaMobilidade),
+                              check('precisaTempoExtra', accessibility?.precisaTempoExtra),
+                              check('consentimentoPcd', accessibility?.consentimentoPcd),
+                            ]}
+                            onSubmit={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/accessibility`, values, 'Acessibilidade atualizada.')}
+                          />
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'agenda' ?(
+                        <div className="profile-section-detail-body">
+                          <RecordForm
+                            fields={[
+                              field('formatoEntrevista', agenda?.preferences.formatoEntrevista),
+                              field('inicioDisponivel', agenda?.preferences.inicioDisponivel),
+                              field('avisoPrevio', agenda?.preferences.avisoPrevio),
+                              field('observacoes', agenda?.preferences.observacoes, 'textarea'),
+                              field('horarioPreferido', agenda?.preferences.horarioPreferido),
+                              field('fusoHorario', agenda?.preferences.fusoHorario),
+                            ]}
+                            checks={[
+                              check('diaSeg', agenda?.preferences.diaSeg),
+                              check('diaTer', agenda?.preferences.diaTer),
+                              check('diaQua', agenda?.preferences.diaQua),
+                              check('diaQui', agenda?.preferences.diaQui),
+                              check('diaSex', agenda?.preferences.diaSex),
+                              check('diaSab', agenda?.preferences.diaSab),
+                              check('diaDom', agenda?.preferences.diaDom),
+                              check('periodoManha', agenda?.preferences.periodoManha),
+                              check('periodoTarde', agenda?.preferences.periodoTarde),
+                              check('periodoNoite', agenda?.preferences.periodoNoite),
+                            ]}
+                            onSubmit={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/agenda`, values, 'Preferências de agenda salvas.')}
+                          />
+
+                          <RepeaterSection
+                            title="Bloqueios"
+                            items={agenda?.blocks ?? []}
+                            describe={(item) => `${item.data || 'Data'} • ${item.horario || 'Horário'} • ${item.observacoes || 'Sem observações'}`}
+                            fields={[
+                              { name: 'tipo', label: 'Tipo' },
+                              { name: 'titulo', label: 'Titulo' },
+                              { name: 'data', label: 'Data' },
+                              { name: 'horario', label: 'Horário' },
+                              { name: 'observacoes', label: 'Observações' },
+                            ]}
+                            onAdd={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/agenda/blocks`, values, 'Bloqueio adicionado.', 'POST')}
+                            onDelete={(item) => void removeItem(`/api/public/portal-candidates/${candidateId}/agenda/blocks/${item.id}`, 'Bloqueio removido.')}
+                          />
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'hist' ?(
+                        <div className="profile-section-detail-body">
+                          <div className="detail-group">
+                            <div className="detail-group-title">Histórico de candidaturas</div>
+                            <div className="detail-callout">
+                              <strong>Paridade em andamento:</strong> a timeline detalhada entra na próxima rodada, mas o fluxo do modal já está alinhado com o .NET.
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'notif' ?(
+                        <div className="profile-section-detail-body">
+                          <RecordForm
+                            fields={[
+                              field('frequencia', notifications?.frequencia),
+                              field('idioma', notifications?.idioma),
+                              field('email', notifications?.email),
+                              field('telefone', notifications?.telefone),
+                              field('silencioAtivo', notifications?.silencioAtivo),
+                              field('silencioInicio', notifications?.silencioInicio),
+                              field('silencioFim', notifications?.silencioFim),
+                              field('silencioPrioridade', notifications?.silencioPrioridade),
+                              field('assinatura', notifications?.assinatura),
+                            ]}
+                            checks={[
+                              check('canalEmail', notifications?.canalEmail),
+                              check('canalWhatsapp', notifications?.canalWhatsapp),
+                              check('canalSms', notifications?.canalSms),
+                              check('canalPush', notifications?.canalPush),
+                              check('permiteContato', notifications?.permiteContato),
+                              check('alertaNovasVagas', notifications?.alertaNovasVagas),
+                              check('alertaAtualizacoes', notifications?.alertaAtualizacoes),
+                              check('alertaEntrevistas', notifications?.alertaEntrevistas),
+                              check('alertaMensagens', notifications?.alertaMensagens),
+                              check('alertaDocumentos', notifications?.alertaDocumentos),
+                              check('alertaLembretes', notifications?.alertaLembretes),
+                            ]}
+                            onSubmit={(values) => void saveJson(`/api/public/portal-candidates/${candidateId}/notifications`, values, 'Notificacoes atualizadas.')}
+                          />
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'matches' ?(
+                        <div className="profile-section-detail-body">
+                          <div className="detail-group">
+                            <div className="detail-group-title">Vagas sugeridas</div>
+                            {matches.length ?(
+                              <div className="detail-match-list">
+                                {matches.map((match) => (
+                                  <article className="detail-match-card" key={match.vagaId}>
+                                    <div>
+                                      <strong>{match.title || 'Vaga sem t?tulo'}</strong>
+                                      <p>{match.area || '?rea n?o informada'} ? {match.city || 'Cidade'} {match.uf || ''}</p>
+                                    </div>
+                                    <span>{match.score}%</span>
+                                  </article>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="detail-paragraph">Nenhuma vaga sugerida no momento.</p>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {selectedSection === 'clear' ?(
+                        <div className="profile-section-detail-body">
+                          <div className="detail-group">
+                            <div className="detail-group-title">Limpar perfil</div>
+                            <p className="detail-paragraph">
+                              Use esta a??o para limpar os dados auxiliares do perfil, como no portal .NET.
+                            </p>
+                            <button className="profile-danger-button" type="button" onClick={() => void handleResetProfile()}>
+                              <i className="fas fa-eraser" aria-hidden="true"></i>
+                              <span>Limpar perfil</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </section>
               </div>
             )}
-            {message ? <div className={`inline-alert ${message.includes('sucesso') ? 'success' : 'error'}`}>{message}</div> : null}
           </div>
+
+          {skillEditorOpen ?(
+            <div className="profile-inline-modal-backdrop" onClick={() => setSkillEditorOpen(false)}>
+              <div className="profile-inline-modal-card" onClick={(event) => event.stopPropagation()}>
+                <div className="profile-inline-modal-header">
+                  <h3>Competência</h3>
+                  <button type="button" className="profile-modal-close" onClick={() => setSkillEditorOpen(false)} aria-label="Fechar">
+                    <i className="fas fa-times" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <div className="profile-inline-modal-body">
+                  <label className="profile-mini-field">
+                    <span>Tipo</span>
+                    <select value={skillDraft.tipo} onChange={(e) => setSkillDraft((v) => ({ ...v, tipo: e.target.value }))}>
+                      <option value="Hard">Hard skill</option>
+                      <option value="Soft">Soft skill</option>
+                      <option value="Idioma">Idioma</option>
+                    </select>
+                  </label>
+                  <label className="profile-mini-field">
+                    <span>Nome</span>
+                    <input value={skillDraft.nome} onChange={(e) => setSkillDraft((v) => ({ ...v, nome: e.target.value }))} placeholder="Ex.: Excel, Comunicação, Inglês" />
+                  </label>
+                  <label className="profile-mini-field">
+                    <span>Nível</span>
+                    <select value={skillDraft.nivel} onChange={(e) => setSkillDraft((v) => ({ ...v, nivel: e.target.value }))}>
+                      <option value="Básico">Básico</option>
+                      <option value="Intermediário">Intermediário</option>
+                      <option value="Avançado">Avançado</option>
+                    </select>
+                  </label>
+                  <label className="profile-mini-field">
+                    <span>Evidência (opcional)</span>
+                    <input value={skillDraft.evidencia} onChange={(e) => setSkillDraft((v) => ({ ...v, evidencia: e.target.value }))} placeholder="Ex.: Projeto X, curso Y" />
+                  </label>
+                </div>
+                <div className="profile-inline-modal-footer">
+                  <button className="profile-modal-footer-btn secondary" type="button" onClick={() => setSkillEditorOpen(false)}>Cancelar</button>
+                  <button className="profile-modal-footer-btn primary" type="button" onClick={() => void saveSkillEditor()}>Salvar</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {certEditorOpen ?(
+            <div className="profile-inline-modal-backdrop" onClick={() => setCertEditorOpen(false)}>
+              <div className="profile-inline-modal-card" onClick={(event) => event.stopPropagation()}>
+                <div className="profile-inline-modal-header">
+                  <h3>Certificação / Curso</h3>
+                  <button type="button" className="profile-modal-close" onClick={() => setCertEditorOpen(false)} aria-label="Fechar">
+                    <i className="fas fa-times" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <div className="profile-inline-modal-body">
+                  <label className="profile-mini-field">
+                    <span>Nome</span>
+                    <input value={certDraft.nome} onChange={(e) => setCertDraft((v) => ({ ...v, nome: e.target.value }))} placeholder="Ex.: NR-10, Excel Avançado" />
+                  </label>
+                  <div className="profile-inline-modal-grid">
+                    <label className="profile-mini-field">
+                      <span>Instituição</span>
+                      <input value={certDraft.instituicao} onChange={(e) => setCertDraft((v) => ({ ...v, instituicao: e.target.value }))} placeholder="Ex.: SENAI" />
+                    </label>
+                    <label className="profile-mini-field">
+                      <span>Ano</span>
+                      <input value={certDraft.ano} onChange={(e) => setCertDraft((v) => ({ ...v, ano: e.target.value }))} placeholder="Ex.: 2025" />
+                    </label>
+                  </div>
+                  <label className="profile-mini-field">
+                    <span>Link (opcional)</span>
+                    <input value={certDraft.link} onChange={(e) => setCertDraft((v) => ({ ...v, link: e.target.value }))} placeholder="https://..." />
+                  </label>
+                </div>
+                <div className="profile-inline-modal-footer">
+                  <button className="profile-modal-footer-btn secondary" type="button" onClick={() => setCertEditorOpen(false)}>Cancelar</button>
+                  <button className="profile-modal-footer-btn primary" type="button" onClick={() => void saveCertificationEditor()}>Salvar</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="profile-modal-footer">
             <button className="profile-modal-footer-btn secondary" type="button" onClick={onClose}>Cancelar</button>
-            <button className="profile-modal-footer-btn primary" type="submit" disabled={saving || loading}>
-              {saving ? 'Salvando...' : 'Salvar'}
+            <button className="profile-modal-footer-btn primary" type="button" onClick={() => void handleSave()} disabled={saving || loading}>
+              {saving ?'Salvando...' : 'Salvar'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )
@@ -1302,14 +2357,14 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
   }
 
   if (loading) {
-    return <PageLoading label="Sincronizando seu perfil e suas preferências..." />
+    return <PageLoading label="Sincronizando seu perfil e suas prefer?ncias..." />
   }
 
   if (message && !state.profile) {
     return (
       <main className="page-shell">
         <section className="state-card unavailable">
-          <h3>Não foi possível carregar seu espaço</h3>
+          <h3>N?o foi poss?vel carregar seu espa?o</h3>
           <p>{message}</p>
           <button className="primary-btn" type="button" onClick={() => void refreshWorkspace()}>Tentar novamente</button>
         </section>
@@ -1331,21 +2386,21 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
         </div>
       </section>
 
-      {message ? <div className="toast-banner">{message}</div> : null}
+      {message ?<div className="toast-banner">{message}</div> : null}
 
       <section className="summary-grid">
-        <SummaryCard title="Conclusão do perfil" value={`${state.completion?.overall ?? 0}%`} detail="Score consolidado pelo serviço de completion" />
+        <SummaryCard title="Conclus?o do perfil" value={`${state.completion?.overall ?? 0}%`} detail="Score consolidado pelo servi?o de completion" />
         <SummaryCard title="Job matches" value={String(state.matches.length)} detail="Oportunidades mais aderentes ao seu perfil" />
-        <SummaryCard title="Documentos" value={String(state.documents.length)} detail="Arquivos auxiliares além do currículo" />
-        <SummaryCard title="Referências" value={String(state.references.length)} detail="Pessoas que podem endossar sua trajetória" />
+        <SummaryCard title="Documentos" value={String(state.documents.length)} detail="Arquivos auxiliares al?m do curr?culo" />
+        <SummaryCard title="Refer?ncias" value={String(state.references.length)} detail="Pessoas que podem endossar sua trajet?ria" />
       </section>
 
       <div className="content-grid">
         <section className="content-column">
-          <WorkspaceSection title="Perfil e currículo" description="Dados pessoais, foto, resumo e documentos principais.">
+          <WorkspaceSection title="Perfil e curr?culo" description="Dados pessoais, foto, resumo e documentos principais.">
             <div className="profile-shell">
               <div className="avatar-plate">
-                {avatarPreview ? <img src={avatarPreview} alt={state.profile?.nome || 'Avatar do candidato'} /> : <span>{getInitials(state.profile?.nome || ctx.session?.candidate.nome || 'Candidato')}</span>}
+                {avatarPreview ?<img src={avatarPreview} alt={state.profile?.nome || 'Avatar do candidato'} /> : <span>{getInitials(state.profile?.nome || ctx.session?.candidate.nome || 'Candidato')}</span>}
               </div>
               <label className="upload-label">
                 Alterar avatar
@@ -1377,14 +2432,14 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
 
             <div className="toolbar-row">
               <label className="upload-label">
-                Enviar currículo
+                Enviar curr?culo
                 <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => {
                   const file = e.target.files?.[0]
-                  if (file) void uploadFile(`/api/public/portal-candidates/${candidateId}/curriculos`, 'arquivo', file, 'Currículo enviado.')
+                  if (file) void uploadFile(`/api/public/portal-candidates/${candidateId}/curriculos`, 'arquivo', file, 'Curr?culo enviado.')
                 }} />
               </label>
               <label className="upload-label">
-                Parsear currículo
+                Parsear curr?culo
                 <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
@@ -1395,14 +2450,14 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                     .catch((err) => setMessage(readError(err)))
                 }} />
               </label>
-              <button className="secondary-btn" type="button" onClick={() => void openResumeHtml(authFetch, candidateId)}>Abrir currículo HTML</button>
+              <button className="secondary-btn" type="button" onClick={() => void openResumeHtml(authFetch, candidateId)}>Abrir curr?culo HTML</button>
               <button className="secondary-btn" type="button" onClick={() => void downloadResumePdf(authFetch, candidateId)}>Baixar PDF gerado</button>
             </div>
 
-            {resumeParsePreview ? <pre className="json-preview">{resumeParsePreview}</pre> : null}
+            {resumeParsePreview ?<pre className="json-preview">{resumeParsePreview}</pre> : null}
           </WorkspaceSection>
 
-          <WorkspaceSection title="Conclusão e aderência" description="Diagnóstico automático do perfil e vagas com maior match.">
+          <WorkspaceSection title="Conclus?o e ader?ncia" description="Diagn?stico autom?tico do perfil e vagas com maior match.">
             <div className="completion-shell">
               {Object.entries(state.completion?.sections ?? {}).map(([key, value]) => (
                 <div key={key} className="metric-row">
@@ -1421,16 +2476,16 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
             <div className="matches-grid">
               {state.matches.map((match) => (
                 <article key={match.vagaId} className="inline-card">
-                  <strong>{match.title || 'Vaga sem título'}</strong>
-                  <p>{match.area || 'Área não informada'} • {match.city || 'Cidade'} {match.uf || ''}</p>
-                  <span>Score {match.score}% • {match.mode || 'Formato flexível'}</span>
-                  {match.reason ? <small>{match.reason}</small> : null}
+                  <strong>{match.title || 'Vaga sem t?tulo'}</strong>
+                  <p>{match.area || '?rea n?o informada'} ? {match.city || 'Cidade'} {match.uf || ''}</p>
+                  <span>Score {match.score}% ? {match.mode || 'Formato flex?vel'}</span>
+                  {match.reason ?<small>{match.reason}</small> : null}
                 </article>
               ))}
             </div>
           </WorkspaceSection>
 
-          <WorkspaceSection title="Skills, links e certificações" description="Competências, preferências rápidas e links do portfólio.">
+          <WorkspaceSection title="Skills, links e certifica??es" description="Compet?ncias, prefer?ncias r?pidas e links do portf?lio.">
             <RecordForm
               fields={[
                 field('WorkModel', state.portfolio?.preferences.workModel),
@@ -1444,39 +2499,39 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 field('Drive', state.portfolio?.links.drive),
                 field('Tags', state.portfolio?.tags),
               ]}
-              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio`, values, 'Preferências e links salvos.')}
+              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio`, values, 'Prefer?ncias e links salvos.')}
             />
 
             <RepeaterSection
               title="Skills"
               items={state.portfolio?.skills ?? []}
-              describe={(item) => `${item.tipo}  ${item.nivel}${item.evidencia ? `  ${item.evidencia}` : ''}`}
+              describe={(item) => `${item.tipo}  ${item.nivel}${item.evidencia ?`  ${item.evidencia}` : ''}`}
               onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio/skills`, values, 'Skill adicionada.', 'POST')}
               onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/skills-portfolio/skills/${item.id}`, 'Skill removida.')}
               fields={[
                 { name: 'tipo', label: 'Tipo' },
                 { name: 'nome', label: 'Nome' },
-                { name: 'nivel', label: 'Nível' },
-                { name: 'evidencia', label: 'Evidência' },
+                { name: 'nivel', label: 'N?vel' },
+                { name: 'evidencia', label: 'Evid?ncia' },
               ]}
             />
 
             <RepeaterSection
-              title="Certificações"
+              title="Certifica??es"
               items={state.portfolio?.certifications ?? []}
-              describe={(item) => `${item.instituicao || 'Instituição livre'} ${item.ano ? `• ${item.ano}` : ''}`}
-              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications`, values, 'Certificação adicionada.', 'POST')}
-              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications/${item.id}`, 'Certificação removida.')}
+              describe={(item) => `${item.instituicao || 'Institui??o livre'} ${item.ano ?`? ${item.ano}` : ''}`}
+              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications`, values, 'Certifica??o adicionada.', 'POST')}
+              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/skills-portfolio/certifications/${item.id}`, 'Certifica??o removida.')}
               fields={[
                 { name: 'nome', label: 'Nome' },
-                { name: 'instituicao', label: 'Instituição' },
+                { name: 'instituicao', label: 'Institui??o' },
                 { name: 'ano', label: 'Ano' },
                 { name: 'link', label: 'Link' },
               ]}
             />
           </WorkspaceSection>
 
-          <WorkspaceSection title="Educação" description="Resumo da formação e histórico acadêmico detalhado.">
+          <WorkspaceSection title="Educa??o" description="Resumo da forma??o e hist?rico acad?mico detalhado.">
             <RecordForm
               fields={[
                 field('nivel', state.education?.summary.nivel),
@@ -1487,19 +2542,19 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
               onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/education`, values, 'Resumo educacional salvo.')}
             />
             <RepeaterSection
-              title="Cursos e formações"
+              title="Cursos e forma??es"
               items={state.education?.items ?? []}
-              describe={(item) => `${item.instituicao || 'Instituição livre'} • ${item.status || 'Status aberto'}`}
-              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/education/items`, values, 'Formação adicionada.', 'POST')}
-              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/education/items/${item.id}`, 'Formação removida.')}
+              describe={(item) => `${item.instituicao || 'Institui??o livre'} ? ${item.status || 'Status aberto'}`}
+              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/education/items`, values, 'Forma??o adicionada.', 'POST')}
+              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/education/items/${item.id}`, 'Forma??o removida.')}
               fields={[
                 { name: 'curso', label: 'Curso' },
-                { name: 'instituicao', label: 'Instituição' },
+                { name: 'instituicao', label: 'Institui??o' },
                 { name: 'tipo', label: 'Tipo' },
                 { name: 'status', label: 'Status' },
-                { name: 'inicio', label: 'Início' },
+                { name: 'inicio', label: 'In?cio' },
                 { name: 'fim', label: 'Fim' },
-                { name: 'observacoes', label: 'Observações' },
+                { name: 'observacoes', label: 'Observa??es' },
                 { name: 'link', label: 'Link' },
               ]}
             />
@@ -1507,17 +2562,17 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
         </section>
 
         <section className="content-column">
-          <WorkspaceSection title="Experiências e projetos" description="Linha do tempo profissional e cases de entrega.">
+          <WorkspaceSection title="Experi?ncias e projetos" description="Linha do tempo profissional e cases de entrega.">
             <RepeaterSection
-              title="Experiências"
+              title="Experi?ncias"
               items={state.experience?.experiences ?? []}
               describe={(item) => `${item.cargo}  ${item.inicio || '?'} a ${item.fim || 'atual'}`}
-              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/experiences`, values, 'Experiência adicionada.', 'POST')}
-              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/experiences/${item.id}`, 'Experiência removida.')}
+              onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/experiences`, values, 'Experi?ncia adicionada.', 'POST')}
+              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/experiences/${item.id}`, 'Experi?ncia removida.')}
               fields={[
                 { name: 'empresa', label: 'Empresa' },
                 { name: 'cargo', label: 'Cargo' },
-                { name: 'inicio', label: 'Início' },
+                { name: 'inicio', label: 'In?cio' },
                 { name: 'fim', label: 'Fim' },
                 { name: 'local', label: 'Local / modelo' },
                 { name: 'atividades', label: 'Atividades' },
@@ -1526,13 +2581,13 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
             <RepeaterSection
               title="Projetos"
               items={state.experience?.projects ?? []}
-              describe={(item) => `${item.periodo || 'Período livre'} • ${item.stack || 'Stack aberta'}`}
+              describe={(item) => `${item.periodo || 'Per?odo livre'} ? ${item.stack || 'Stack aberta'}`}
               onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/projects`, values, 'Projeto adicionado.', 'POST')}
               onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/projects/${item.id}`, 'Projeto removido.')}
               fields={[
                 { name: 'nome', label: 'Nome' },
-                { name: 'periodo', label: 'Período' },
-                { name: 'descricao', label: 'Descrição' },
+                { name: 'periodo', label: 'Per?odo' },
+                { name: 'descricao', label: 'Descri??o' },
                 { name: 'link', label: 'Link' },
                 { name: 'stack', label: 'Stack' },
                 { name: 'destaques', label: 'Destaques' },
@@ -1540,7 +2595,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
             />
           </WorkspaceSection>
 
-          <WorkspaceSection title="Preferências de vaga" description="Objetivo profissional, deslocamento, jornada e remuneração.">
+          <WorkspaceSection title="Prefer?ncias de vaga" description="Objetivo profissional, deslocamento, jornada e remunera??o.">
             <RecordForm
               fields={[
                 field('CargoAlvo', asString(state.preferences?.CargoAlvo)),
@@ -1561,7 +2616,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 field('BeneficiosDesejados', asString(state.preferences?.BeneficiosDesejados)),
                 field('NaoAbreMaoDe', asString(state.preferences?.NaoAbreMaoDe)),
               ]}
-              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/preferences`, values, 'Preferências salvas.')}
+              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/preferences`, values, 'Prefer?ncias salvas.')}
             />
           </WorkspaceSection>
 
@@ -1587,25 +2642,25 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 check('periodoTarde', state.agenda?.preferences.periodoTarde),
                 check('periodoNoite', state.agenda?.preferences.periodoNoite),
               ]}
-              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/agenda`, values, 'Preferências de agenda salvas.')}
+              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/agenda`, values, 'Prefer?ncias de agenda salvas.')}
             />
             <RepeaterSection
               title="Bloqueios"
               items={state.agenda?.blocks ?? []}
-              describe={(item) => `${item.data || 'Data'} • ${item.horario || 'Horário'} • ${item.observacoes || 'Sem observações'}`}
+              describe={(item) => `${item.data || 'Data'} ? ${item.horario || 'Hor?rio'} ? ${item.observacoes || 'Sem observa??es'}`}
               onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/agenda/blocks`, values, 'Bloqueio adicionado.', 'POST')}
               onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/agenda/blocks/${item.id}`, 'Bloqueio removido.')}
               fields={[
                 { name: 'tipo', label: 'Tipo' },
-                { name: 'titulo', label: 'Título' },
+                { name: 'titulo', label: 'T?tulo' },
                 { name: 'data', label: 'Data' },
-                { name: 'horario', label: 'Horário' },
-                { name: 'observacoes', label: 'Observações' },
+                { name: 'horario', label: 'Hor?rio' },
+                { name: 'observacoes', label: 'Observa??es' },
               ]}
             />
           </WorkspaceSection>
 
-          <WorkspaceSection title="Notificações e LGPD" description="Consentimentos, canais e prioridades de contato.">
+          <WorkspaceSection title="Notifica??es e LGPD" description="Consentimentos, canais e prioridades de contato.">
             <RecordForm
               fields={[
                 field('frequencia', state.notifications?.frequencia),
@@ -1631,7 +2686,7 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 check('alertaDocumentos', state.notifications?.alertaDocumentos),
                 check('alertaLembretes', state.notifications?.alertaLembretes),
               ]}
-              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/notifications`, values, 'Notificações atualizadas.')}
+              onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/notifications`, values, 'Notifica??es atualizadas.')}
             />
 
             <RecordForm
@@ -1648,17 +2703,17 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
               ]}
               onSubmit={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/lgpd`, {
                 ...values,
-                retencaoMeses: values.retencaoMeses ? Number(values.retencaoMeses) : null,
-              }, 'Preferências LGPD atualizadas.')}
+                retencaoMeses: values.retencaoMeses ?Number(values.retencaoMeses) : null,
+              }, 'Prefer?ncias LGPD atualizadas.')}
             />
             <button className="secondary-btn" type="button" onClick={() => void openLgpdReceipt(authFetch, candidateId)}>Abrir comprovante LGPD</button>
           </WorkspaceSection>
 
-          <WorkspaceSection title="Documentos, referências e acessibilidade" description="Toda a camada complementar do perfil do candidato.">
+          <WorkspaceSection title="Documentos, refer?ncias e acessibilidade" description="Toda a camada complementar do perfil do candidato.">
             <RepeaterSection
               title="Documentos"
               items={state.documents}
-              describe={(item) => `${item.tipo}  ${item.data || 'Sem data'} ${item.fileName ? ` ${item.fileName}` : ''}`}
+              describe={(item) => `${item.tipo}  ${item.data || 'Sem data'} ${item.fileName ?` ${item.fileName}` : ''}`}
               onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/documents`, values, 'Documento salvo.', 'POST')}
               onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/documents/${item.id}`, 'Documento removido.')}
               fields={[
@@ -1666,30 +2721,30 @@ function CandidateWorkspace({ ctx }: { ctx: AuthContext }) {
                 { name: 'nome', label: 'Nome' },
                 { name: 'link', label: 'Link' },
                 { name: 'data', label: 'Data' },
-                { name: 'observacoes', label: 'Observações' },
+                { name: 'observacoes', label: 'Observa??es' },
                 { name: 'fileName', label: 'Nome do arquivo' },
               ]}
             />
 
             <RepeaterSection
-              title="Referências"
+              title="Refer?ncias"
               items={state.references}
-              describe={(item) => `${item.relacao || 'Relação livre'} • ${item.contato || 'Contato não informado'}`}
+              describe={(item) => `${item.relacao || 'Rela??o livre'} ? ${item.contato || 'Contato n?o informado'}`}
               onAdd={(values) => saveJson(`/api/public/portal-candidates/${candidateId}/references`, {
                 ...values,
                 podeContatar: Boolean(values.podeContatar),
-              }, 'Referência salva.', 'POST')}
-              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/references/${item.id}`, 'Referência removida.')}
+              }, 'Refer?ncia salva.', 'POST')}
+              onDelete={(item) => removeItem(`/api/public/portal-candidates/${candidateId}/references/${item.id}`, 'Refer?ncia removida.')}
               fields={[
                 { name: 'nome', label: 'Nome' },
-                { name: 'relacao', label: 'Relação' },
+                { name: 'relacao', label: 'Rela??o' },
                 { name: 'empresa', label: 'Empresa' },
                 { name: 'cargo', label: 'Cargo' },
                 { name: 'contato', label: 'Contato' },
-                { name: 'periodo', label: 'Período' },
+                { name: 'periodo', label: 'Per?odo' },
                 { name: 'linkedin', label: 'LinkedIn' },
-                { name: 'observacoes', label: 'Observações' },
-                { name: 'podeContatar', label: 'Pode contatar? (true/false)' },
+                { name: 'observacoes', label: 'Observa??es' },
+                { name: 'podeContatar', label: 'Pode contatar?(true/false)' },
               ]}
             />
 
@@ -1732,24 +2787,26 @@ type AuthContext = {
 
 function createAuthorizedClient(ctx: AuthContext) {
   return async function request<T>(path: string, init?: RequestInit, json = true): Promise<T> {
-    if (!ctx.session) throw new Error('Sessão não encontrada.')
+    if (!ctx.session) throw new Error('Sess?o n?o encontrada.')
 
     const ensured = await ensureSession(ctx.session, ctx.tenantId)
     ctx.setSession(ensured)
 
+    const headers: HeadersInit = {
+      ...(json ?{ 'Content-Type': 'application/json' } : {}),
+      'X-Tenant-Id': ctx.tenantId,
+      ...(ensured.accessToken ?{ Authorization: `Bearer ${ensured.accessToken}` } : {}),
+      ...(init?.headers ?? {}),
+    }
+
     const response = await fetch(await buildApiUrl(path, ctx.tenantId), {
       ...init,
-      headers: {
-        ...(json ? { 'Content-Type': 'application/json' } : {}),
-        'X-Tenant-Id': ctx.tenantId,
-        Authorization: `Bearer ${ensured.accessToken}`,
-        ...(init?.headers ?? {}),
-      },
+      headers,
     })
 
     if (!response.ok) {
       if (response.status === 401) {
-        ctx.notifyAuthError('Sua sessão expirou. Entre novamente.')
+        ctx.notifyAuthError('Sua sess?o expirou. Entre novamente.')
         ctx.setSession(null)
       }
       throw new Error(await readApiMessage(response))
@@ -1761,14 +2818,14 @@ function createAuthorizedClient(ctx: AuthContext) {
 }
 
 async function fetchAuthorizedBlobUrl(ctx: AuthContext, path: string) {
-  if (!ctx.session) throw new Error('Sessão não encontrada.')
+  if (!ctx.session) throw new Error('Sess?o n?o encontrada.')
   const ensured = await ensureSession(ctx.session, ctx.tenantId)
   ctx.setSession(ensured)
 
   const response = await fetch(await buildApiUrl(path, ctx.tenantId), {
     headers: {
       'X-Tenant-Id': ctx.tenantId,
-      Authorization: `Bearer ${ensured.accessToken}`,
+      ...(ensured.accessToken ?{ Authorization: `Bearer ${ensured.accessToken}` } : {}),
     },
   })
   if (!response.ok) throw new Error(await readApiMessage(response))
@@ -1777,6 +2834,8 @@ async function fetchAuthorizedBlobUrl(ctx: AuthContext, path: string) {
 }
 
 async function ensureSession(session: AuthSession, tenantId: string) {
+  if (!session.accessToken || !session.refreshToken) return session
+
   const expiresAt = new Date(session.accessTokenExpiresAtUtc).getTime()
   if (expiresAt - Date.now() > 60_000) return session
 
@@ -1868,14 +2927,14 @@ function RecordForm({
       {fields.map((fieldItem) => (
         <label key={fieldItem.name}>
           <span>{fieldItem.label}</span>
-          {fieldItem.kind === 'textarea' ? (
+          {fieldItem.kind === 'textarea' ?(
             <textarea rows={4} value={String(values[fieldItem.name] ?? '')} onChange={(e) => setValues((v) => ({ ...v, [fieldItem.name]: e.target.value }))} />
           ) : (
             <input value={String(values[fieldItem.name] ?? '')} onChange={(e) => setValues((v) => ({ ...v, [fieldItem.name]: e.target.value }))} />
           )}
         </label>
       ))}
-      {checks?.length ? (
+      {checks?.length ?(
         <div className="checks-grid">
           {checks.map((checkItem) => (
             <label key={checkItem.name} className="check-row">
@@ -1889,7 +2948,7 @@ function RecordForm({
           ))}
         </div>
       ) : null}
-      <button className="primary-btn" type="submit">Salvar se??o</button>
+      <button className="primary-btn" type="submit">Salvar seção</button>
     </form>
   )
 }
@@ -1927,7 +2986,7 @@ function RepeaterSection<TItem extends { id: string }>({
             <button className="ghost-btn" type="button" onClick={() => onDelete(item)}>Remover</button>
           </article>
         ))}
-        {items.length === 0 ? <div className="empty-inline">Nenhum item registrado ainda.</div> : null}
+        {items.length === 0 ?<div className="empty-inline">Nenhum item registrado ainda.</div> : null}
       </div>
       <form
         className="grid-form"
@@ -1985,9 +3044,9 @@ const JOB_HERO_GRADIENTS = [
 ]
 
 const JOB_SECTION_IMAGES = [
-  { match: 'industrial', title: 'Operações Industriais', image: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&q=80&w=1600' },
+  { match: 'industrial', title: 'Opera??es Industriais', image: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&q=80&w=1600' },
   { match: 'qualidade', title: 'Qualidade & P&D', image: 'https://images.unsplash.com/photo-1582719471384-894fbb16e074?auto=format&fit=crop&q=80&w=1600' },
-  { match: 'logistica', title: 'Logística & Supply', image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1600' },
+  { match: 'logistica', title: 'Log?stica & Supply', image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1600' },
   { match: 'rh', title: 'Administrativo & RH', image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1600' },
   { match: 'administrativo', title: 'Administrativo & RH', image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1600' },
   { match: 'comercial', title: 'Vendas & Marketing', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1600' },
@@ -2022,7 +3081,7 @@ function formatJobLocation(job: PortalJob) {
   if (city && uf) return `${city}, ${uf}`
   if (city) return city
   if (uf) return uf
-  return job.modalidade || 'Não informado'
+  return job.modalidade || 'N?o informado'
 }
 
 function normalizeAreaKey(value: string | null | undefined) {
@@ -2081,17 +3140,47 @@ function getRepeaterTitle(item: Record<string, unknown>) {
 }
 
 function withTenant(path: string, tenantId: string) {
-  const separator = path.includes('?') ? '&' : '?'
+  const separator = path.includes('?') ?'&' : '?'
   return `${path}${separator}${TENANT_QUERY_KEY}=${encodeURIComponent(tenantId)}`
 }
 
-function loadStoredSession(storageKey: string) {
+function loadStoredSession(storageKey: string, tenantId: string) {
   try {
     const raw = localStorage.getItem(storageKey)
-    return raw ? (JSON.parse(raw) as AuthSession) : null
+    return raw ?normalizeAuthSession(JSON.parse(raw) as AuthResponse, tenantId) : null
   } catch {
     return null
   }
+}
+
+function normalizeAuthSession(response: AuthResponse, tenantId: string): AuthSession {
+  if (isAuthSession(response)) {
+    return {
+      ...response,
+      candidate: {
+        ...response.candidate,
+        tenantId: response.candidate.tenantId || tenantId,
+      },
+    }
+  }
+
+  return {
+    accessToken: '',
+    accessTokenExpiresAtUtc: '',
+    accessTokenExpiresInSeconds: 0,
+    refreshToken: '',
+    refreshTokenExpiresAtUtc: '',
+    candidate: {
+      id: response.id,
+      nome: response.nome,
+      email: response.email,
+      tenantId: response.tenantId || tenantId,
+    },
+  }
+}
+
+function isAuthSession(response: AuthResponse): response is AuthSession {
+  return 'candidate' in response
 }
 
 function persistSession(storageKey: string, session: AuthSession) {
@@ -2105,13 +3194,15 @@ function clearSession(storageKey: string) {
 async function signOutPortalSession(ctx: AuthContext) {
   if (ctx.session) {
     try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'X-Tenant-Id': ctx.tenantId,
+        ...(ctx.session.accessToken ?{ Authorization: `Bearer ${ctx.session.accessToken}` } : {}),
+      }
+
       await fetch(await buildApiUrl('/api/public/portal-auth/logout', ctx.tenantId), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Tenant-Id': ctx.tenantId,
-          Authorization: `Bearer ${ctx.session.accessToken}`,
-        },
+        headers,
         body: JSON.stringify({ refreshToken: ctx.session.refreshToken }),
       })
     } catch {
@@ -2124,8 +3215,8 @@ async function signOutPortalSession(ctx: AuthContext) {
 
 async function buildApiUrl(path: string, tenantId?: string) {
   const baseUrl = await resolveApiBaseUrl()
-  const normalized = path.startsWith('/') ? path : `/${path}`
-  const url = new URL(baseUrl ? `${baseUrl}${normalized}` : normalized, window.location.origin)
+  const normalized = path.startsWith('/') ?path : `/${path}`
+  const url = new URL(baseUrl ?`${baseUrl}${normalized}` : normalized, window.location.origin)
   if (tenantId) {
     url.searchParams.set(TENANT_QUERY_KEY, tenantId)
   }
@@ -2194,6 +3285,17 @@ async function openLgpdReceipt(authFetch: ReturnType<typeof createAuthorizedClie
 }
 
 export default App
+
+
+
+
+
+
+
+
+
+
+
 
 
 
